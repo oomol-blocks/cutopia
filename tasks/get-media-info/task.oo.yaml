@@ -1,0 +1,47 @@
+ui:
+  default_width: 450
+inputs_def:
+  - handle: mediaPath
+    description: Input
+    json_schema:
+      type: string
+      ui:widget: file
+outputs_def:
+  - handle: mediaPath
+    json_schema:
+      type: string
+      ui:widget: file
+  - handle: mediaInfo
+    description: Output
+    json_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        format_name:
+          type: string
+        audioChannels:
+          type: string
+        codeRate:
+          type: string
+        codecs:
+          type: string
+        colorProfile:
+          type: string
+        duration:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        size:
+          type: string
+        quality:
+          type: string
+        dimensions:
+          type: string
+executor:
+  name: nodejs
+  options:
+    entry: main.ts
+    spawn: false
+icon: ":skill-icons:typescript:"

@@ -1,0 +1,58 @@
+ui:
+  default_width: 450
+executor:
+  name: nodejs
+  options:
+    entry: ./bundled/main.js
+    spawn: false
+inputs_def:
+  - handle: mediaPath
+    description: Input
+    json_schema:
+      type: string
+      ui:widget: file
+  - handle: mediaInfo
+    description: Input
+    json_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        format_name:
+          type: string
+        audioChannels:
+          type: string
+        codeRate:
+          type: string
+        codecs:
+          type: string
+        colorProfile:
+          type: string
+        duration:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        size:
+          type: string
+        quality:
+          type: string
+        dimensions:
+          type: string
+  - handle: isCompress
+    json_schema:
+      type: boolean
+  - handle: targetFormat
+    json_schema:
+      ui:widget: self::targetFormat
+      ui:options:
+        title: TargetFormat
+    value:
+      name: MP4
+      value: .mp4
+outputs_def:
+  - handle: output
+    description: Output
+    json_schema:
+      {}
+icon: ":skill-icons:typescript:"

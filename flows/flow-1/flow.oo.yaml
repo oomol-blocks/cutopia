@@ -1,0 +1,24 @@
+nodes:
+  - node_id: cutopia#1
+    task: self::cutopia
+    inputs_from:
+      - handle: mediaPath
+        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-04 at 15.19.58.mov
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaPath
+      - handle: isCompress
+        value: false
+      - handle: targetFormat
+        value:
+          name: MP4
+          value: .mp4
+      - handle: mediaInfo
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: get-media-info#1
+    task: self::get-media-info
+    inputs_from:
+      - handle: mediaPath
+        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-04 at 15.19.58.mov

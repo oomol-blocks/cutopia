@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build-cutopia": "node build-cutopia.js"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.25.5",
+    "react": "^19.1.0",
+    "react-select": "^5.10.1"
+  }
+}
