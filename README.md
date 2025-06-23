@@ -1,6 +1,6 @@
 <div align=center>
   <h1>Cutopia</h1>
-  <p> 中文 | <a href="./README-zh.md">English</a></p>
+  <p><a href="./README-zh.md">中文</a> | English</p>
 </div>
 
 A comprehensive video processing solution built with Oomol blocks, powered by `FFmpeg` for professional-grade media analysis and format conversion capabilities.

@@ -1,6 +1,6 @@
 <div align=center>
   <h1>Cutopia</h1>
-  <p><a href="./README.md">English</a> | 中文</p>
+  <p>中文 | <a href="./README.md">English</a></p>
 </div>
 
 基于 OOMOL Blocks 构建的视频处理解决方案，使用 `FFmpeg` 媒体分析和格式转换功能。
