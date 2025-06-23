@@ -7,7 +7,7 @@ scripts:
     poetry install --no-root
 contributes:
   input_widgets:
-    render: ./tasks/cutopia/bundled/inputRender.js
+    render: ./tasks/converter/bundled/inputRender.js
     widgets:
       - name: targetFormat
         json_schema:
@@ -15,3 +15,12 @@ contributes:
             title: TargetFormat
 dependencies:
   oomol-preview: 0.0.5
+name: cutopia
+description: Cutopia
+displayName: Cutopia
+repository: https://github.com/oomol-blocks/cutopia
+releaseNotes: |-
+  1. get media info
+  2. convert video
+  3. preview video
+icon: ./icon.png

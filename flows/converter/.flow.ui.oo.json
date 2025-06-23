@@ -1,0 +1,31 @@
+{
+  "nodes": {
+    "converter#1": {
+      "contentWidth": 450,
+      "rfNode": {
+        "position": {
+          "x": 464.1666666666667,
+          "y": 188.00413131713867
+        }
+      }
+    },
+    "get-media-info#1": {
+      "contentWidth": 450,
+      "rfNode": {
+        "position": {
+          "x": -104.83333333333327,
+          "y": 188.00413131713867
+        }
+      }
+    },
+    "video_preview#1": {
+      "contentWidth": 450,
+      "rfNode": {
+        "position": {
+          "x": 1029.2360951475528,
+          "y": 188.00413131713867
+        }
+      }
+    }
+  }
+}

@@ -4,23 +4,23 @@ const tasks = [
     {
         name: 'render',
         config: {
-            entryPoints: ['tasks/cutopia/inputRender.tsx'],
+            entryPoints: ['tasks/converter/inputRender.tsx'],
             bundle: true,
             format: 'esm',
             loader: { '.svg': 'dataurl' },
             define: { 'process.env.NODE_ENV': '"production"' },
-            outfile: 'tasks/cutopia/bundled/inputRender.js'
+            outfile: 'tasks/converter/bundled/inputRender.js'
         }
     },
     {
         name: 'entry',
         config: {
-            entryPoints: ['tasks/cutopia/main.ts'],
+            entryPoints: ['tasks/converter/main.ts'],
             bundle: true,
             platform: 'node',
             format: 'esm',
             target: 'node16',
-            outdir: 'tasks/cutopia/bundled',
+            outdir: 'tasks/converter/bundled',
             external: [
                 // Node.js 内置模块
                 'os',

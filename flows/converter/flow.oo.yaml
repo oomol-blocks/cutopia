@@ -1,32 +1,32 @@
+title: converter
 nodes:
-  - node_id: cutopia#1
-    task: self::cutopia
+  - node_id: converter#1
     inputs_from:
       - handle: mediaPath
-        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-04 at 15.19.58.mov
         from_node:
           - node_id: get-media-info#1
             output_handle: mediaPath
-      - handle: isCompress
-        value: true
-      - handle: targetFormat
-        value:
-          name: WEBM
-          value: .webm
       - handle: mediaInfo
         from_node:
           - node_id: get-media-info#1
             output_handle: mediaInfo
+      - handle: isCompress
+        value: false
+      - handle: targetFormat
+        value:
+          name: MP4
+          value: .mp4
+    task: self::converter
   - node_id: get-media-info#1
-    task: self::get-media-info
     inputs_from:
       - handle: mediaPath
-        value: /oomol-driver/oomol-storage/1601363746034307.mp4
+        value: /oomol-driver/oomol-storage/1601363746034307-1750655937947.webm
+    task: self::get-media-info
   - node_id: video_preview#1
     title: "Video preview #1"
     inputs_from:
       - handle: video_path
         from_node:
-          - node_id: cutopia#1
+          - node_id: converter#1
             output_handle: media
     task: oomol-preview::video_preview
