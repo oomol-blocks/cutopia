@@ -55,4 +55,4 @@ outputs_def:
     description: Output
     json_schema:
       type: string
-icon: ":skill-icons:typescript:"
+icon: ":carbon:video-player:"

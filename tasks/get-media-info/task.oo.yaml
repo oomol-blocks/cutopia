@@ -44,4 +44,4 @@ executor:
   options:
     entry: main.ts
     spawn: false
-icon: ":skill-icons:typescript:"
+icon: ":carbon:location-info:"
