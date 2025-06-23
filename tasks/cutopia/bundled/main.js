@@ -414,7 +414,7 @@ var VideoConverter = class _VideoConverter {
         const minutes = parseInt(durationMatch[2], 10);
         const seconds = parseFloat(durationMatch[3]);
         this.totalDuration = hours * 3600 + minutes * 60 + seconds;
-        console.log(`\u{1F4CF} \u4ECEFFmpeg\u8F93\u51FA\u89E3\u6790\u5230\u89C6\u9891\u65F6\u957F: ${this.totalDuration.toFixed(2)}\u79D2`);
+        console.log(`\u{1F4CF} \u89C6\u9891\u65F6\u957F: ${this.totalDuration.toFixed(2)}\u79D2`);
       }
     }
   }
@@ -518,7 +518,6 @@ Error: ${stderr}`));
     }
     const conversionTime = Date.now() - startTime;
     console.log(`\u23F1\uFE0F \u8F6C\u6362\u8017\u65F6: ${(conversionTime / 1e3).toFixed(1)}\u79D2`);
-    console.log("\u{1F4CA} \u83B7\u53D6\u8F93\u51FA\u6587\u4EF6\u4FE1\u606F...");
     const outputSize = await _VideoConverter.getFileSize(outputPath);
     const compressionRatio = originalSize > 0 ? (originalSize - outputSize) / originalSize * 100 : 0;
     console.log(`\u2705 \u8F93\u51FA\u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(outputSize)}`);
