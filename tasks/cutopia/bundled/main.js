@@ -589,4 +589,3 @@ async function main_default(params, context) {
 export {
   main_default as default
 };
-//# sourceMappingURL=main.js.map
