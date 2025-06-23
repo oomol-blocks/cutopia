@@ -51,8 +51,8 @@ inputs_def:
       name: MP4
       value: .mp4
 outputs_def:
-  - handle: output
+  - handle: media
     description: Output
     json_schema:
-      {}
+      type: string
 icon: ":skill-icons:typescript:"

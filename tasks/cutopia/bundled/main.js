@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 
-// tasks/cutopia/main.ts
+// tasks/cutopia/converter.ts
 import { spawn } from "child_process";
 import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
 import path from "path";
@@ -24,13 +24,45 @@ var VIDEO_FORMATS = [
   ".webm"
 ];
 var FORMAT_CONFIGS = {
-  mp4: { video: "libx264", audio: "aac", container: "mp4" },
-  avi: { video: "libx264", audio: "mp3", container: "avi" },
-  mkv: { video: "libx264", audio: "aac", container: "matroska" },
-  mov: { video: "libx264", audio: "aac", container: "mov" },
+  mp4: {
+    video: "libx264",
+    videoHW: "h264_nvenc",
+    // NVIDIA硬件加速
+    videoQSV: "h264_qsv",
+    // Intel硬件加速
+    audio: "aac",
+    container: "mp4"
+  },
+  avi: {
+    video: "libx264",
+    videoHW: "h264_nvenc",
+    videoQSV: "h264_qsv",
+    audio: "mp3",
+    container: "avi"
+  },
+  mkv: {
+    video: "libx264",
+    videoHW: "h264_nvenc",
+    videoQSV: "h264_qsv",
+    audio: "aac",
+    container: "matroska"
+  },
+  mov: {
+    video: "libx264",
+    videoHW: "h264_nvenc",
+    videoQSV: "h264_qsv",
+    audio: "aac",
+    container: "mov"
+  },
   wmv: { video: "wmv2", audio: "wmav2", container: "asf" },
   webm: { video: "libvpx-vp9", audio: "libopus", container: "webm" },
-  flv: { video: "libx264", audio: "aac", container: "flv" }
+  flv: {
+    video: "libx264",
+    videoHW: "h264_nvenc",
+    videoQSV: "h264_qsv",
+    audio: "aac",
+    container: "flv"
+  }
 };
 var BYTES_PER_GB = 1e9;
 var BYTES_PER_MB = 1e6;
@@ -41,71 +73,17 @@ var QUALITY_THRESHOLDS = {
   HD: { width: 1280, height: 720, bitrate: 2 }
 };
 
-// tasks/cutopia/main.ts
-process.on("uncaughtException", (error) => {
-  console.error("\u672A\u6355\u83B7\u7684\u5F02\u5E38:", error);
-  console.error("\u5806\u6808\u8DDF\u8E2A:", error.stack);
-  process.exit(1);
-});
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("\u672A\u5904\u7406\u7684 Promise \u62D2\u7EDD:", reason);
-  console.error("Promise:", promise);
-  process.exit(1);
-});
-console.log("\u{1F680} \u7A0B\u5E8F\u5F00\u59CB\u542F\u52A8...");
-console.log("Node.js \u7248\u672C:", process.version);
-console.log("\u5F53\u524D\u5DE5\u4F5C\u76EE\u5F55:", process.cwd());
-try {
-  console.log("\u{1F4E6} \u5F00\u59CB\u5BFC\u5165\u4F9D\u8D56...");
-  console.log("\u5BFC\u5165 @ffmpeg-installer/ffmpeg...");
-  const { path: path2 } = await import("@ffmpeg-installer/ffmpeg");
-  console.log("\u2705 ffmpeg \u8DEF\u5F84:", path2);
-  console.log("\u2705 \u6240\u6709\u4F9D\u8D56\u5BFC\u5165\u6210\u529F");
-  console.log("\u{1F3AF} \u5F00\u59CB\u6267\u884C\u4E3B\u8981\u903B\u8F91...");
-  console.log("\u2705 \u7A0B\u5E8F\u6267\u884C\u5B8C\u6210");
-} catch (error) {
-  console.error("\u274C \u7A0B\u5E8F\u6267\u884C\u51FA\u9519:");
-  console.error("\u9519\u8BEF\u4FE1\u606F:", error.message);
-  console.error("\u9519\u8BEF\u7C7B\u578B:", error.constructor.name);
-  console.error("\u5806\u6808\u8DDF\u8E2A:", error.stack);
-  process.exit(1);
-}
-async function main_default(params, context) {
-  var _a;
-  try {
-    const options = {
-      customQuality: params.customQuality,
-      customBitrate: params.customBitrate,
-      preserveMetadata: params.preserveMetadata,
-      hardwareAcceleration: params.hardwareAcceleration,
-      preset: params.preset
-    };
-    console.log("lalal", options);
-    const converter = new VideoConverter(context, options);
-    return await converter.convert(params);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    context.preview({
-      type: "table",
-      data: {
-        columns: ["Error", "Details"],
-        rows: [
-          ["\u274C Conversion Failed", errorMessage],
-          ["File", params.mediaPath || "Unknown"],
-          ["Target Format", ((_a = params.targetFormat) == null ? void 0 : _a.value) || "Unknown"]
-        ]
-      }
-    });
-    throw new ConversionError(`Video conversion failed: ${errorMessage}`, error instanceof Error ? error : void 0);
-  }
-}
+// tasks/cutopia/converter.ts
 var VideoConverter = class _VideoConverter {
   constructor(context, options = {}) {
+    this.totalDuration = 0;
     this.context = context;
     this.options = {
       preserveMetadata: true,
-      hardwareAcceleration: false,
-      preset: "medium",
+      hardwareAcceleration: "auto",
+      preset: "fast",
+      copyStreams: true,
+      threads: 0,
       ...options
     };
   }
@@ -146,24 +124,8 @@ var VideoConverter = class _VideoConverter {
       return 0;
     }
   }
-  static async pathExists(path2) {
-    try {
-      await fs.stat(path2);
-      return true;
-    } catch {
-      return false;
-    }
-  }
   static generateOutputPath(inputPath, targetFormat) {
-    const inputExt = path.extname(inputPath);
-    const basePath = inputPath.replace(inputExt, "");
-    let outputPath = `${basePath}.${targetFormat}`;
-    let counter = 1;
-    while (_VideoConverter.pathExists(outputPath)) {
-      outputPath = `${basePath}_${counter}.${targetFormat}`;
-      counter++;
-    }
-    return outputPath;
+    return `${inputPath.replace(path.extname(inputPath), "")}-${Date.now()}${targetFormat}`;
   }
   getQualityPreset(quality) {
     const { UHD, QHD, FHD, HD } = QUALITY_THRESHOLDS;
@@ -181,37 +143,75 @@ var VideoConverter = class _VideoConverter {
     }
     return { crf: 24 };
   }
+  canCopyStreams(inputFormat, outputFormat) {
+    const compatibleFormats = [".mp4", ".mov"];
+    return compatibleFormats.includes(inputFormat) && compatibleFormats.includes(outputFormat);
+  }
   buildFFmpegArgs(params, outputPath) {
     const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
-    const args = ["-i", mediaPath];
-    if (this.options.hardwareAcceleration) {
-      args.unshift("-hwaccel", "auto");
-    }
-    const formatConfig = FORMAT_CONFIGS[targetFormat.value.toLowerCase()];
+    const args = [];
+    args.push(
+      "-fflags",
+      "+fastseek+genpts",
+      "-probesize",
+      "32M",
+      "-analyzeduration",
+      "10M"
+    );
+    args.push("-i", mediaPath);
+    const kind = targetFormat.value.substring(1);
+    const formatConfig = FORMAT_CONFIGS[kind.toLowerCase()];
     if (!formatConfig) {
       throw new Error(`Unsupported format: ${targetFormat.value}`);
     }
-    args.push("-c:v", formatConfig.video, "-c:a", formatConfig.audio);
-    if (isCompress) {
-      const { width, height } = _VideoConverter.parseDimensions(mediaInfo.dimensions);
-      const qualityPreset = this.getQualityPreset(mediaInfo.quality);
-      if (qualityPreset.targetWidth && qualityPreset.targetHeight) {
-        if (width > qualityPreset.targetWidth || height > qualityPreset.targetHeight) {
-          args.push(
-            "-vf",
-            `scale=${qualityPreset.targetWidth}:${qualityPreset.targetHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`
-          );
+    if (this.options.copyStreams && !isCompress && this.canCopyStreams(path.extname(mediaPath), targetFormat.value)) {
+      console.log("\u{1F680} \u4F7F\u7528\u6D41\u590D\u5236\u6A21\u5F0F\uFF0C\u901F\u5EA6\u6700\u5FEB");
+      args.push("-c", "copy");
+    } else {
+      let videoCodec = formatConfig.video;
+      args.push("-c:v", videoCodec);
+      if (!isCompress) {
+        args.push("-c:a", "copy");
+      } else {
+        args.push("-c:a", formatConfig.audio);
+      }
+      if (isCompress) {
+        const { width, height } = _VideoConverter.parseDimensions(mediaInfo.dimensions);
+        const qualityPreset = this.getQualityPreset(mediaInfo.quality);
+        if (qualityPreset.targetWidth && qualityPreset.targetHeight) {
+          if (width > qualityPreset.targetWidth || height > qualityPreset.targetHeight) {
+            args.push(
+              "-vf",
+              `scale=${qualityPreset.targetWidth}:${qualityPreset.targetHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`
+            );
+          }
+        }
+        const crf = this.options.customQuality || qualityPreset.crf;
+        if (videoCodec.includes("nvenc")) {
+          args.push("-crf", crf.toString());
+        } else if (videoCodec.includes("qsv")) {
+          args.push("-q", crf.toString());
+        } else {
+          args.push("-crf", crf.toString());
+        }
+        if (!args.includes("-c:a") || !args[args.indexOf("-c:a") + 1].includes("copy")) {
+          const audioBitrate = this.options.customBitrate || "128k";
+          args.push("-b:a", audioBitrate);
+        }
+      } else {
+        const crf = this.options.customQuality || 18;
+        if (videoCodec.includes("nvenc")) {
+          args.push("-crf", crf.toString());
+        } else if (videoCodec.includes("qsv")) {
+          args.push("-q", crf.toString());
+        } else {
+          args.push("-crf", crf.toString());
         }
       }
-      const crf = this.options.customQuality || qualityPreset.crf;
-      args.push("-crf", crf.toString());
-      const audioBitrate = this.options.customBitrate || "128k";
-      args.push("-b:a", audioBitrate);
-    } else {
-      const crf = this.options.customQuality || 18;
-      args.push("-crf", crf.toString());
     }
-    args.push("-preset", this.options.preset);
+    if (this.options.threads !== void 0) {
+      args.push("-threads", this.options.threads.toString());
+    }
     if (this.options.preserveMetadata) {
       args.push("-map_metadata", "0");
     } else {
@@ -220,13 +220,28 @@ var VideoConverter = class _VideoConverter {
     args.push(
       "-movflags",
       "+faststart",
-      // Optimize for streaming
+      // 优化streaming
       "-pix_fmt",
-      "yuv420p"
-      // Ensure compatibility
+      "yuv420p",
+      // 兼容性
+      "-y",
+      outputPath
+      // 覆盖输出文件
     );
-    args.push("-y", outputPath);
+    console.log("\u{1F527} FFmpeg\u53C2\u6570:", args.join(" "));
     return args;
+  }
+  parseDurationFromFFmpegOutput(data) {
+    if (this.totalDuration <= 0) {
+      const durationMatch = data.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
+      if (durationMatch) {
+        const hours = parseInt(durationMatch[1], 10);
+        const minutes = parseInt(durationMatch[2], 10);
+        const seconds = parseFloat(durationMatch[3]);
+        this.totalDuration = hours * 3600 + minutes * 60 + seconds;
+        console.log(`\u{1F4CF} \u4ECEFFmpeg\u8F93\u51FA\u89E3\u6790\u5230\u89C6\u9891\u65F6\u957F: ${this.totalDuration.toFixed(2)}\u79D2`);
+      }
+    }
   }
   /**
    * Execute FFmpeg conversion
@@ -240,8 +255,10 @@ var VideoConverter = class _VideoConverter {
         stdout += data.toString();
       });
       ffmpeg.stderr.on("data", (data) => {
-        stderr += data.toString();
-        this.parseProgress(data.toString());
+        const dataStr = data.toString();
+        stderr += dataStr;
+        this.parseDurationFromFFmpegOutput(dataStr);
+        this.parseProgress(dataStr);
       });
       ffmpeg.on("close", (code) => {
         if (code === 0) {
@@ -260,9 +277,14 @@ Error: ${stderr}`));
    * Parse progress information
    */
   parseProgress(data) {
-    const timeMatch = data.match(/time=(\d+:\d+:\d+\.\d+)/);
-    if (timeMatch) {
-      this.context.reportProgress(parseInt(timeMatch[1], 10) / 100 * 100);
+    const timeMatch = data.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+    if (timeMatch && this.totalDuration > 0) {
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const seconds = parseFloat(timeMatch[3]);
+      const currentTimeInSeconds = hours * 3600 + minutes * 60 + seconds;
+      const progress = Math.min(currentTimeInSeconds / this.totalDuration * 100, 100);
+      this.context.reportProgress(progress);
     }
   }
   /**
@@ -273,7 +295,7 @@ Error: ${stderr}`));
     const previewRows = [
       ["Status", "\u2705 Conversion Successful"],
       ["Original File", `${mediaInfo.name} (${mediaInfo.kind.toUpperCase()})`],
-      ["Target Format", targetFormat.value.toUpperCase()],
+      ["Target Format", targetFormat.value.toLowerCase()],
       ["Original Size", _VideoConverter.formatFileSize(originalSize)],
       ["Output Size", _VideoConverter.formatFileSize(outputSize) + compressionInfo],
       ["Conversion Time", `${(conversionTime / 1e3).toFixed(1)}s`],
@@ -293,14 +315,60 @@ Error: ${stderr}`));
    * Execute video conversion
    */
   async convert(params) {
+    console.log("\u{1F3AC} \u5F00\u59CB\u89C6\u9891\u8F6C\u6362\u6D41\u7A0B...");
+    console.log("\u{1F4CB} \u9A8C\u8BC1\u8F93\u5165\u53C2\u6570...");
+    _VideoConverter.validateInputs(params);
+    console.log("\u2705 \u53C2\u6570\u9A8C\u8BC1\u901A\u8FC7");
     const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
-    console.log(mediaInfo, mediaPath, targetFormat, isCompress);
+    console.log("\u{1F4C2} \u8F93\u5165\u6587\u4EF6\u4FE1\u606F:");
+    console.log(`   \u6587\u4EF6\u8DEF\u5F84: ${mediaPath}`);
+    console.log(`   \u6587\u4EF6\u540D: ${mediaInfo.name}`);
+    console.log(`   \u683C\u5F0F: ${mediaInfo.kind.toUpperCase()}`);
+    console.log(`   \u5206\u8FA8\u7387: ${mediaInfo.dimensions}`);
+    console.log(`   \u8D28\u91CF: ${mediaInfo.quality}`);
+    console.log(`   \u76EE\u6807\u683C\u5F0F: ${targetFormat.value.toUpperCase()}`);
+    console.log(`   \u538B\u7F29\u6A21\u5F0F: ${isCompress ? "\u662F" : "\u5426"}`);
+    console.log("\u{1F4C1} \u751F\u6210\u8F93\u51FA\u6587\u4EF6\u8DEF\u5F84...");
+    const outputPath = _VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
+    console.log(`\u2705 \u8F93\u51FA\u8DEF\u5F84: ${outputPath}`);
+    console.log("\u{1F4CF} \u83B7\u53D6\u539F\u59CB\u6587\u4EF6\u5927\u5C0F...");
+    const originalSize = await _VideoConverter.getFileSize(mediaPath);
+    console.log(`\u2705 \u539F\u59CB\u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(originalSize)}`);
+    console.log("\u2699\uFE0F \u6784\u5EFA\u8F6C\u6362\u53C2\u6570...");
+    const ffmpegArgs = this.buildFFmpegArgs(params, outputPath);
+    console.log("\u2705 \u8F6C\u6362\u53C2\u6570\u6784\u5EFA\u5B8C\u6210");
+    console.log("\u{1F680} \u5F00\u59CB\u6267\u884C\u89C6\u9891\u8F6C\u6362...");
+    const startTime = Date.now();
+    try {
+      await this.executeFFmpeg(ffmpegArgs);
+      console.log("\u2705 \u89C6\u9891\u8F6C\u6362\u6210\u529F\u5B8C\u6210!");
+    } catch (error) {
+      console.error("\u274C \u89C6\u9891\u8F6C\u6362\u5931\u8D25:", error.message);
+      throw error;
+    }
+    const conversionTime = Date.now() - startTime;
+    console.log(`\u23F1\uFE0F \u8F6C\u6362\u8017\u65F6: ${(conversionTime / 1e3).toFixed(1)}\u79D2`);
+    console.log("\u{1F4CA} \u83B7\u53D6\u8F93\u51FA\u6587\u4EF6\u4FE1\u606F...");
+    const outputSize = await _VideoConverter.getFileSize(outputPath);
+    const compressionRatio = originalSize > 0 ? (originalSize - outputSize) / originalSize * 100 : 0;
+    console.log(`\u2705 \u8F93\u51FA\u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(outputSize)}`);
+    if (compressionRatio > 0) {
+      console.log(`\u{1F4C9} \u538B\u7F29\u6BD4\u4F8B: ${compressionRatio.toFixed(1)}%`);
+    }
+    console.log("\u{1F4CB} \u751F\u6210\u8F6C\u6362\u62A5\u544A...");
+    this.createPreview(
+      mediaInfo,
+      targetFormat,
+      originalSize,
+      outputSize,
+      compressionRatio,
+      conversionTime,
+      isCompress
+    );
+    console.log("\u2705 \u8F6C\u6362\u62A5\u544A\u751F\u6210\u5B8C\u6210");
+    console.log("\u{1F389} \u89C6\u9891\u8F6C\u6362\u6D41\u7A0B\u5168\u90E8\u5B8C\u6210!");
     return {
-      output: "outputPath"
-      // originalSize,
-      // outputSize,
-      // compressionRatio: Math.round(compressionRatio * 100) / 100,
-      // conversionTime
+      media: outputPath
     };
   }
 };
@@ -311,6 +379,37 @@ var ConversionError = class extends Error {
     this.name = "ConversionError";
   }
 };
+
+// tasks/cutopia/main.ts
+async function main_default(params, context) {
+  var _a;
+  try {
+    const options = {
+      customQuality: params.customQuality,
+      customBitrate: params.customBitrate,
+      preserveMetadata: params.preserveMetadata || false,
+      hardwareAcceleration: params.hardwareAcceleration || "auto",
+      preset: params.preset || "fast"
+    };
+    console.log("input: ", params.targetFormat);
+    const converter = new VideoConverter(context, options);
+    return await converter.convert(params);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    context.preview({
+      type: "table",
+      data: {
+        columns: ["Error", "Details"],
+        rows: [
+          ["\u274C Conversion Failed", errorMessage],
+          ["File", params.mediaPath || "Unknown"],
+          ["Target Format", ((_a = params.targetFormat) == null ? void 0 : _a.value) || "Unknown"]
+        ]
+      }
+    });
+    throw new ConversionError(`Video conversion failed: ${errorMessage}`, error instanceof Error ? error : void 0);
+  }
+}
 export {
   main_default as default
 };

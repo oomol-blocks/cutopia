@@ -6,7 +6,7 @@ import MOV_SVG from "./icons/mov.svg";
 import WebM_SVG from "./icons/webm.svg";
 import WMV_SVG from "./icons/wmv.svg";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { createRoot } from "react-dom/client";
 import Select, { components } from "react-select";
@@ -29,11 +29,11 @@ interface SelectOption {
 const VideoIconMap: Record<VideoFormatType, string> = {
   '.mp4': MP4_SVG,
   '.mov': MOV_SVG,
-  '.flv': FLV_SVG,
-  '.avi': AVI_SVG,
   '.mkv': MKV_SVG,
   '.wmv': WMV_SVG,
   '.webm': WebM_SVG,
+  '.flv': FLV_SVG,
+  '.avi': AVI_SVG,
 };
 
 export function targetFormat(dom: HTMLElement, context: InputRenderContext) {
@@ -51,7 +51,8 @@ export function targetFormat(dom: HTMLElement, context: InputRenderContext) {
 }
 
 function VideoFormatSelector() {
-  const [videoFormats, setVideoFormats] = useState<VideoFormatOption[]>([]);
+  // TODO：根据用户输入的类型，判断显示哪些可转换的类型
+  const [videoFormats] = useState<VideoFormatOption[]>(VideoFormatConfig.getAllFormats());
   const [selectedVideoFormat, setSelectedVideoFormat] = useState<VideoFormatType>(
     VideoFormatConfig.getDefaultFormat()
   );
@@ -60,25 +61,21 @@ function VideoFormatSelector() {
   const readonly = !context?.store?.context?.canEditValue;
   const initialValue = context?.store?.value$?.value as VideoFormatOption | undefined;
 
+  const selectOptions: SelectOption[] = useMemo(() => videoFormats.map((format) => ({
+    value: format.value,
+    label: VideoFormatConfig.formatLabel(format.value),
+  })), [videoFormats])
+
+  const currentValue: SelectOption = useMemo(() => ({
+    value: selectedVideoFormat,
+    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
+  }), [selectedVideoFormat]);
+
   useEffect(() => {
     if (initialValue?.value && VideoFormatConfig.isValidFormat(initialValue.value)) {
       setSelectedVideoFormat(initialValue.value);
     }
   }, [initialValue]);
-
-  useEffect(() => {
-    if (context?.postMessage) {
-      context.postMessage("getVideoFormatOptions", (formats: VideoFormatOption[]) => {
-        if (formats?.length) {
-          setVideoFormats(formats);
-        } else {
-          setVideoFormats(VideoFormatConfig.getAllFormats());
-        }
-      });
-    } else {
-      setVideoFormats(VideoFormatConfig.getAllFormats());
-    }
-  }, [context]);
 
   useEffect(() => {
     const formatOption: VideoFormatOption = {
@@ -93,16 +90,6 @@ function VideoFormatSelector() {
     if (selectedOption?.value) {
       setSelectedVideoFormat(selectedOption.value);
     }
-  };
-
-  const selectOptions: SelectOption[] = videoFormats.map((format) => ({
-    value: format.value,
-    label: VideoFormatConfig.formatLabel(format.value),
-  }));
-
-  const currentValue: SelectOption = {
-    value: selectedVideoFormat,
-    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
   };
 
   return (

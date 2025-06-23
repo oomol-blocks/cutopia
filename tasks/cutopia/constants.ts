@@ -4,13 +4,43 @@ export const VIDEO_FORMATS = [
 ] as const;
 
 export const FORMAT_CONFIGS = {
-    mp4: { video: 'libx264', audio: 'aac', container: 'mp4' },
-    avi: { video: 'libx264', audio: 'mp3', container: 'avi' },
-    mkv: { video: 'libx264', audio: 'aac', container: 'matroska' },
-    mov: { video: 'libx264', audio: 'aac', container: 'mov' },
+    mp4: { 
+        video: 'libx264', 
+        videoHW: 'h264_nvenc', // NVIDIA硬件加速
+        videoQSV: 'h264_qsv',  // Intel硬件加速
+        audio: 'aac', 
+        container: 'mp4' 
+    },
+    avi: { 
+        video: 'libx264', 
+        videoHW: 'h264_nvenc',
+        videoQSV: 'h264_qsv',
+        audio: 'mp3', 
+        container: 'avi' 
+    },
+    mkv: { 
+        video: 'libx264', 
+        videoHW: 'h264_nvenc',
+        videoQSV: 'h264_qsv',
+        audio: 'aac', 
+        container: 'matroska' 
+    },
+    mov: { 
+        video: 'libx264', 
+        videoHW: 'h264_nvenc',
+        videoQSV: 'h264_qsv',
+        audio: 'aac', 
+        container: 'mov' 
+    },
     wmv: { video: 'wmv2', audio: 'wmav2', container: 'asf' },
     webm: { video: 'libvpx-vp9', audio: 'libopus', container: 'webm' },
-    flv: { video: 'libx264', audio: 'aac', container: 'flv' }
+    flv: { 
+        video: 'libx264', 
+        videoHW: 'h264_nvenc',
+        videoQSV: 'h264_qsv',
+        audio: 'aac', 
+        container: 'flv' 
+    }
 } as const;
 
 export const HARDWARE_ACCELERATION = {
@@ -56,9 +86,11 @@ export const CODEC_MAPPINGS = {
 } as const;
 
 export interface ConversionOptions {
-    customQuality?: number; // CRF值，0-51范围
-    customBitrate?: string; // 自定义音频比特率
-    preserveMetadata?: boolean; // 是否保留元数据
-    hardwareAcceleration?: boolean; // 是否使用硬件加速
+    customQuality?: number;
+    customBitrate?: string;
+    preserveMetadata?: boolean;
+    hardwareAcceleration?: boolean | 'nvidia' | 'intel' | 'auto'; // 扩展硬件加速选项
     preset?: 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
+    copyStreams?: boolean; // 直接复制流，最快的转换方式
+    threads?: number; // 线程数
 }

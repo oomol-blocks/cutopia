@@ -17844,11 +17844,11 @@ var VIDEO_FORMATS = [
 var VideoIconMap = {
   ".mp4": mp4_default,
   ".mov": mov_default,
-  ".flv": flv_default,
-  ".avi": avi_default,
   ".mkv": mkv_default,
   ".wmv": wmv_default,
-  ".webm": webm_default
+  ".webm": webm_default,
+  ".flv": flv_default,
+  ".avi": avi_default
 };
 function targetFormat(dom, context) {
   window.inputRenderContext = context;
@@ -17861,31 +17861,26 @@ function targetFormat(dom, context) {
   };
 }
 function VideoFormatSelector() {
-  const [videoFormats, setVideoFormats] = (0, import_react9.useState)([]);
+  const [videoFormats] = (0, import_react9.useState)(VideoFormatConfig.getAllFormats());
   const [selectedVideoFormat, setSelectedVideoFormat] = (0, import_react9.useState)(
     VideoFormatConfig.getDefaultFormat()
   );
   const context = window.inputRenderContext;
   const readonly = !context?.store?.context?.canEditValue;
   const initialValue = context?.store?.value$?.value;
+  const selectOptions = (0, import_react9.useMemo)(() => videoFormats.map((format) => ({
+    value: format.value,
+    label: VideoFormatConfig.formatLabel(format.value)
+  })), [videoFormats]);
+  const currentValue = (0, import_react9.useMemo)(() => ({
+    value: selectedVideoFormat,
+    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
+  }), [selectedVideoFormat]);
   (0, import_react9.useEffect)(() => {
     if (initialValue?.value && VideoFormatConfig.isValidFormat(initialValue.value)) {
       setSelectedVideoFormat(initialValue.value);
     }
   }, [initialValue]);
-  (0, import_react9.useEffect)(() => {
-    if (context?.postMessage) {
-      context.postMessage("getVideoFormatOptions", (formats) => {
-        if (formats?.length) {
-          setVideoFormats(formats);
-        } else {
-          setVideoFormats(VideoFormatConfig.getAllFormats());
-        }
-      });
-    } else {
-      setVideoFormats(VideoFormatConfig.getAllFormats());
-    }
-  }, [context]);
   (0, import_react9.useEffect)(() => {
     const formatOption = {
       name: VideoFormatConfig.getFormatName(selectedVideoFormat),
@@ -17897,14 +17892,6 @@ function VideoFormatSelector() {
     if (selectedOption?.value) {
       setSelectedVideoFormat(selectedOption.value);
     }
-  };
-  const selectOptions = videoFormats.map((format) => ({
-    value: format.value,
-    label: VideoFormatConfig.formatLabel(format.value)
-  }));
-  const currentValue = {
-    value: selectedVideoFormat,
-    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
   };
   return /* @__PURE__ */ import_react9.default.createElement("div", { className: "video-container" }, /* @__PURE__ */ import_react9.default.createElement(
     StateManagedSelect$1,
