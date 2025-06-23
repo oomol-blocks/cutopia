@@ -8,7 +8,7 @@ nodes:
           - node_id: get-media-info#1
             output_handle: mediaPath
       - handle: isCompress
-        value: false
+        value: true
       - handle: targetFormat
         value:
           name: MP4
@@ -22,3 +22,11 @@ nodes:
     inputs_from:
       - handle: mediaPath
         value: /oomol-driver/oomol-storage/vboard-2025-06-23754ed0.webm
+  - node_id: video_preview#1
+    title: "Video preview #1"
+    inputs_from:
+      - handle: video_path
+        from_node:
+          - node_id: cutopia#1
+            output_handle: media
+    task: oomol-preview::video_preview

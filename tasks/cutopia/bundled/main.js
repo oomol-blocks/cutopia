@@ -7,6 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 
+// tasks/cutopia/main.ts
+import * as fs2 from "node:fs/promises";
+
 // tasks/cutopia/converter.ts
 import { spawn } from "child_process";
 import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
@@ -27,51 +30,109 @@ var FORMAT_CONFIGS = {
   mp4: {
     video: "libx264",
     videoHW: "h264_nvenc",
-    // NVIDIA硬件加速
     videoQSV: "h264_qsv",
-    // Intel硬件加速
     audio: "aac",
-    container: "mp4"
+    container: "mp4",
+    pixelFormat: "yuv420p"
   },
   avi: {
     video: "libx264",
     videoHW: "h264_nvenc",
     videoQSV: "h264_qsv",
     audio: "mp3",
-    container: "avi"
+    container: "avi",
+    pixelFormat: "yuv420p"
   },
   mkv: {
     video: "libx264",
     videoHW: "h264_nvenc",
     videoQSV: "h264_qsv",
     audio: "aac",
-    container: "matroska"
+    container: "matroska",
+    pixelFormat: "yuv420p"
   },
   mov: {
     video: "libx264",
     videoHW: "h264_nvenc",
     videoQSV: "h264_qsv",
     audio: "aac",
-    container: "mov"
+    container: "mov",
+    pixelFormat: "yuv420p"
   },
-  wmv: { video: "wmv2", audio: "wmav2", container: "asf" },
-  webm: { video: "libvpx-vp9", audio: "libopus", container: "webm" },
+  wmv: {
+    video: "wmv2",
+    audio: "wmav2",
+    container: "asf",
+    pixelFormat: "yuv420p"
+  },
+  webm: {
+    video: "libvpx-vp9",
+    audio: "libopus",
+    container: "webm",
+    pixelFormat: "yuv420p"
+  },
   flv: {
     video: "libx264",
     videoHW: "h264_nvenc",
     videoQSV: "h264_qsv",
     audio: "aac",
-    container: "flv"
+    container: "flv",
+    pixelFormat: "yuv420p"
+  }
+};
+var FFMPEG_PARAMS = {
+  INPUT_OPTIMIZATION: {
+    fflags: "+fastseek+genpts",
+    probesize: "16M",
+    // 从32M降低到16M
+    analyzeduration: "5M"
+    // 从10M降低到5M
+  },
+  THREAD_OPTIMIZATION: {
+    maxThreads: 4,
+    // 限制最大线程数
+    defaultThreads: 2
+    // 默认线程数
+  },
+  QUALITY_PRESETS: {
+    fast: { crf: 28, nvenc_cq: 28, qsv_q: 28 },
+    medium: { crf: 24, nvenc_cq: 24, qsv_q: 24 },
+    high: { crf: 20, nvenc_cq: 20, qsv_q: 20 },
+    lossless: { crf: 18, nvenc_cq: 18, qsv_q: 18 }
+  },
+  AUDIO_BITRATES: {
+    low: "96k",
+    medium: "128k",
+    high: "192k",
+    lossless: "320k"
+  },
+  PRESETS: {
+    software: ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"],
+    nvenc: ["fast", "medium", "slow"],
+    qsv: ["veryfast", "faster", "fast", "medium", "slow"]
+  }
+};
+var CODEC_COMPATIBILITY = {
+  // 视频编码兼容性
+  video: {
+    h264: ["mp4", "avi", "mkv", "mov", "flv"],
+    h265: ["mp4", "mkv", "mov"],
+    vp8: ["webm"],
+    vp9: ["webm", "mkv"],
+    wmv2: ["wmv"],
+    xvid: ["avi"]
+  },
+  // 音频编码兼容性
+  audio: {
+    aac: ["mp4", "mkv", "mov", "flv"],
+    mp3: ["avi", "mkv"],
+    opus: ["webm", "mkv"],
+    vorbis: ["webm", "mkv"],
+    wmav2: ["wmv"]
   }
 };
 var BYTES_PER_GB = 1e9;
 var BYTES_PER_MB = 1e6;
-var QUALITY_THRESHOLDS = {
-  UHD: { width: 3840, height: 2160, bitrate: 15, highBitrate: 10 },
-  QHD: { width: 2560, height: 1440, bitrate: 8 },
-  FHD: { width: 1920, height: 1080, bitrate: 5, mediumBitrate: 2 },
-  HD: { width: 1280, height: 720, bitrate: 2 }
-};
 
 // tasks/cutopia/converter.ts
 var VideoConverter = class _VideoConverter {
@@ -83,7 +144,7 @@ var VideoConverter = class _VideoConverter {
       hardwareAcceleration: "auto",
       preset: "fast",
       copyStreams: true,
-      threads: 0,
+      threads: Math.min(options.maxThreads || FFMPEG_PARAMS.THREAD_OPTIMIZATION.maxThreads, 4),
       ...options
     };
   }
@@ -124,109 +185,223 @@ var VideoConverter = class _VideoConverter {
       return 0;
     }
   }
+  static getFileSizeFromMediaInfo(mediaInfo) {
+    if (typeof mediaInfo.size === "number") {
+      return mediaInfo.size;
+    }
+    if (typeof mediaInfo.size === "string") {
+      const sizeMatch = mediaInfo.size.match(/^([\d.]+)\s*(GB|MB|KB|B)$/i);
+      if (sizeMatch) {
+        const value = parseFloat(sizeMatch[1]);
+        const unit = sizeMatch[2].toUpperCase();
+        switch (unit) {
+          case "GB":
+            return Math.floor(value * BYTES_PER_GB);
+          case "MB":
+            return Math.floor(value * BYTES_PER_MB);
+          case "KB":
+            return Math.floor(value * 1e3);
+          case "B":
+            return Math.floor(value);
+          default:
+            return 0;
+        }
+      }
+    }
+    return 0;
+  }
   static generateOutputPath(inputPath, targetFormat) {
     return `${inputPath.replace(path.extname(inputPath), "")}-${Date.now()}${targetFormat}`;
   }
-  getQualityPreset(quality) {
-    const { UHD, QHD, FHD, HD } = QUALITY_THRESHOLDS;
-    if (quality.includes("4K")) {
-      return { crf: 28, targetWidth: 1920, targetHeight: 1080 };
+  getQualityPreset(quality, isCompress) {
+    if (!isCompress) {
+      return FFMPEG_PARAMS.QUALITY_PRESETS.lossless;
     }
-    if (quality.includes("2K")) {
-      return { crf: 26, targetWidth: 1920, targetHeight: 1080 };
+    if (quality.includes("4K") || quality.includes("UHD")) {
+      return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
     }
-    if (quality.includes("1080p")) {
-      return { crf: 28 };
+    if (quality.includes("2K") || quality.includes("QHD")) {
+      return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
     }
-    if (quality.includes("720p")) {
-      return { crf: 24 };
+    if (quality.includes("1080p") || quality.includes("FHD")) {
+      return FFMPEG_PARAMS.QUALITY_PRESETS.fast;
     }
-    return { crf: 24 };
+    if (quality.includes("720p") || quality.includes("HD")) {
+      return FFMPEG_PARAMS.QUALITY_PRESETS.fast;
+    }
+    return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
   }
-  canCopyStreams(inputFormat, outputFormat) {
-    const compatibleFormats = [".mp4", ".mov"];
-    return compatibleFormats.includes(inputFormat) && compatibleFormats.includes(outputFormat);
+  canCopyAllStreams(mediaInfo, targetFormat) {
+    if (!this.options.copyStreams) return false;
+    const { videoCompatible, audioCompatible } = this.checkStreamCompatibility(mediaInfo, targetFormat);
+    console.log(`\u{1F50D} \u5B8C\u5168\u6D41\u590D\u5236\u68C0\u67E5:`);
+    console.log(`   \u89C6\u9891\u517C\u5BB9: ${videoCompatible ? "\u2705" : "\u274C"}`);
+    console.log(`   \u97F3\u9891\u517C\u5BB9: ${audioCompatible ? "\u2705" : "\u274C"}`);
+    console.log(`   \u53EF\u5B8C\u5168\u590D\u5236: ${videoCompatible && audioCompatible ? "\u2705" : "\u274C"}`);
+    return videoCompatible && audioCompatible;
+  }
+  checkStreamCompatibility(mediaInfo, targetFormat) {
+    const targetFormatKey = targetFormat.substring(1);
+    const targetConfig = FORMAT_CONFIGS[targetFormatKey.toLowerCase()];
+    if (!targetConfig) {
+      return {
+        videoCompatible: false,
+        audioCompatible: false,
+        videoCodec: null,
+        audioCodec: null
+      };
+    }
+    const videoCodec = this.extractVideoCodec(mediaInfo);
+    const audioCodec = this.extractAudioCodec(mediaInfo);
+    if (!videoCodec || !audioCodec) {
+      return {
+        videoCompatible: false,
+        audioCompatible: false,
+        videoCodec,
+        audioCodec
+      };
+    }
+    const videoCompatible = this.isCodecCompatible(videoCodec, targetFormatKey, "video");
+    const audioCompatible = this.isCodecCompatible(audioCodec, targetFormatKey, "audio");
+    return {
+      videoCompatible,
+      audioCompatible,
+      videoCodec,
+      audioCodec
+    };
+  }
+  addVideoCodecArgs(args, formatConfig, videoCompatible, isCompress, mediaInfo) {
+    if (videoCompatible && !isCompress) {
+      console.log("\u{1F3A5} \u89C6\u9891\u6D41\u590D\u5236\u6A21\u5F0F");
+      args.push("-c:v", "copy");
+    } else {
+      console.log("\u{1F3A5} \u89C6\u9891\u91CD\u65B0\u7F16\u7801");
+      const videoCodecName = formatConfig.video;
+      args.push("-c:v", videoCodecName);
+      this.addVideoQualityArgs(args, videoCodecName, isCompress, mediaInfo);
+    }
+  }
+  addAudioCodecArgs(args, formatConfig, audioCompatible, isCompress) {
+    if (audioCompatible && !isCompress) {
+      console.log("\u{1F3B5} \u97F3\u9891\u6D41\u590D\u5236\u6A21\u5F0F");
+      args.push("-c:a", "copy");
+    } else {
+      console.log("\u{1F3B5} \u97F3\u9891\u91CD\u65B0\u7F16\u7801");
+      args.push("-c:a", formatConfig.audio);
+      const audioBitrate = this.options.customBitrate || FFMPEG_PARAMS.AUDIO_BITRATES.medium;
+      args.push("-b:a", audioBitrate);
+    }
+  }
+  addVideoQualityArgs(args, videoCodecName, isCompress, mediaInfo) {
+    const qualityPreset = this.getQualityPreset(mediaInfo.quality, isCompress);
+    if (isCompress) {
+      const { width, height } = _VideoConverter.parseDimensions(mediaInfo.dimensions);
+      if (width > 1920 || height > 1080) {
+        args.push(
+          "-vf",
+          "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2"
+        );
+      }
+    }
+    const customQuality = this.options.customQuality;
+    let qualityValue;
+    if (videoCodecName.includes("nvenc")) {
+      qualityValue = customQuality || qualityPreset.nvenc_cq;
+      args.push("-cq", qualityValue.toString());
+      args.push("-preset", "fast");
+    } else if (videoCodecName.includes("qsv")) {
+      qualityValue = customQuality || qualityPreset.qsv_q;
+      args.push("-q", qualityValue.toString());
+      args.push("-preset", "fast");
+    } else {
+      qualityValue = customQuality || qualityPreset.crf;
+      args.push("-crf", qualityValue.toString());
+      args.push("-preset", this.options.preset);
+    }
+  }
+  extractVideoCodec(mediaInfo) {
+    if (mediaInfo.videoCodec) {
+      return mediaInfo.videoCodec.toLowerCase();
+    }
+    if (mediaInfo.codecs) {
+      const codecs = mediaInfo.codecs.toLowerCase();
+      if (codecs.includes("h264") || codecs.includes("avc")) return "h264";
+      if (codecs.includes("h265") || codecs.includes("hevc")) return "h265";
+      if (codecs.includes("vp9")) return "vp9";
+      if (codecs.includes("vp8")) return "vp8";
+      if (codecs.includes("wmv")) return "wmv2";
+    }
+    const containerFormat = mediaInfo.containerFormat || mediaInfo.kind;
+    if (containerFormat) {
+      const format = containerFormat.toLowerCase();
+      if (format === "webm") return "vp9";
+      if (format === "wmv") return "wmv2";
+    }
+    return null;
+  }
+  extractAudioCodec(mediaInfo) {
+    if (mediaInfo.audioCodec) {
+      return mediaInfo.audioCodec.toLowerCase();
+    }
+    if (mediaInfo.codecs) {
+      const codecs = mediaInfo.codecs.toLowerCase();
+      if (codecs.includes("aac")) return "aac";
+      if (codecs.includes("mp3")) return "mp3";
+      if (codecs.includes("opus")) return "opus";
+      if (codecs.includes("vorbis")) return "vorbis";
+      if (codecs.includes("wmav2")) return "wmav2";
+    }
+    const containerFormat = mediaInfo.containerFormat || mediaInfo.kind;
+    if (containerFormat) {
+      const format = containerFormat.toLowerCase();
+      if (format === "webm") return "opus";
+      if (format === "wmv") return "wmav2";
+    }
+    return null;
+  }
+  isCodecCompatible(codec, targetFormat, type) {
+    const compatibility = CODEC_COMPATIBILITY[type];
+    const codecFormats = compatibility[codec];
+    return codecFormats ? codecFormats.includes(targetFormat) : false;
   }
   buildFFmpegArgs(params, outputPath) {
     const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
     const args = [];
     args.push(
       "-fflags",
-      "+fastseek+genpts",
+      FFMPEG_PARAMS.INPUT_OPTIMIZATION.fflags,
       "-probesize",
-      "32M",
+      FFMPEG_PARAMS.INPUT_OPTIMIZATION.probesize,
       "-analyzeduration",
-      "10M"
+      FFMPEG_PARAMS.INPUT_OPTIMIZATION.analyzeduration
     );
     args.push("-i", mediaPath);
-    const kind = targetFormat.value.substring(1);
-    const formatConfig = FORMAT_CONFIGS[kind.toLowerCase()];
+    const targetFormatKey = targetFormat.value.substring(1);
+    const formatConfig = FORMAT_CONFIGS[targetFormatKey.toLowerCase()];
     if (!formatConfig) {
       throw new Error(`Unsupported format: ${targetFormat.value}`);
     }
-    if (this.options.copyStreams && !isCompress && this.canCopyStreams(path.extname(mediaPath), targetFormat.value)) {
-      console.log("\u{1F680} \u4F7F\u7528\u6D41\u590D\u5236\u6A21\u5F0F\uFF0C\u901F\u5EA6\u6700\u5FEB");
+    const streamCompatibility = this.checkStreamCompatibility(mediaInfo, targetFormat.value);
+    const { videoCompatible, audioCompatible, videoCodec, audioCodec } = streamCompatibility;
+    if (this.canCopyAllStreams(mediaInfo, targetFormat.value) && !isCompress) {
+      console.log("\u{1F680} \u4F7F\u7528\u5B8C\u5168\u6D41\u590D\u5236\u6A21\u5F0F");
       args.push("-c", "copy");
     } else {
-      let videoCodec = formatConfig.video;
-      args.push("-c:v", videoCodec);
-      if (!isCompress) {
-        args.push("-c:a", "copy");
-      } else {
-        args.push("-c:a", formatConfig.audio);
-      }
-      if (isCompress) {
-        const { width, height } = _VideoConverter.parseDimensions(mediaInfo.dimensions);
-        const qualityPreset = this.getQualityPreset(mediaInfo.quality);
-        if (qualityPreset.targetWidth && qualityPreset.targetHeight) {
-          if (width > qualityPreset.targetWidth || height > qualityPreset.targetHeight) {
-            args.push(
-              "-vf",
-              `scale=${qualityPreset.targetWidth}:${qualityPreset.targetHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`
-            );
-          }
-        }
-        const crf = this.options.customQuality || qualityPreset.crf;
-        if (videoCodec.includes("nvenc")) {
-          args.push("-crf", crf.toString());
-        } else if (videoCodec.includes("qsv")) {
-          args.push("-q", crf.toString());
-        } else {
-          args.push("-crf", crf.toString());
-        }
-        if (!args.includes("-c:a") || !args[args.indexOf("-c:a") + 1].includes("copy")) {
-          const audioBitrate = this.options.customBitrate || "128k";
-          args.push("-b:a", audioBitrate);
-        }
-      } else {
-        const crf = this.options.customQuality || 18;
-        if (videoCodec.includes("nvenc")) {
-          args.push("-crf", crf.toString());
-        } else if (videoCodec.includes("qsv")) {
-          args.push("-q", crf.toString());
-        } else {
-          args.push("-crf", crf.toString());
-        }
-      }
+      this.addVideoCodecArgs(args, formatConfig, videoCompatible, isCompress, mediaInfo);
+      this.addAudioCodecArgs(args, formatConfig, audioCompatible, isCompress);
     }
-    if (this.options.threads !== void 0) {
-      args.push("-threads", this.options.threads.toString());
-    }
+    const maxThreads = this.options.threads || FFMPEG_PARAMS.THREAD_OPTIMIZATION.defaultThreads;
+    args.push("-threads", maxThreads.toString());
     if (this.options.preserveMetadata) {
       args.push("-map_metadata", "0");
-    } else {
-      args.push("-map_metadata", "-1");
     }
     args.push(
       "-movflags",
       "+faststart",
-      // 优化streaming
       "-pix_fmt",
-      "yuv420p",
-      // 兼容性
+      formatConfig.pixelFormat || "yuv420p",
       "-y",
       outputPath
-      // 覆盖输出文件
     );
     console.log("\u{1F527} FFmpeg\u53C2\u6570:", args.join(" "));
     return args;
@@ -316,27 +491,22 @@ Error: ${stderr}`));
    */
   async convert(params) {
     console.log("\u{1F3AC} \u5F00\u59CB\u89C6\u9891\u8F6C\u6362\u6D41\u7A0B...");
-    console.log("\u{1F4CB} \u9A8C\u8BC1\u8F93\u5165\u53C2\u6570...");
     _VideoConverter.validateInputs(params);
     console.log("\u2705 \u53C2\u6570\u9A8C\u8BC1\u901A\u8FC7");
     const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
+    let originalSize = _VideoConverter.getFileSizeFromMediaInfo(mediaInfo);
+    if (originalSize === 0) {
+      originalSize = await _VideoConverter.getFileSize(mediaPath);
+      mediaInfo.size = originalSize;
+    }
     console.log("\u{1F4C2} \u8F93\u5165\u6587\u4EF6\u4FE1\u606F:");
     console.log(`   \u6587\u4EF6\u8DEF\u5F84: ${mediaPath}`);
-    console.log(`   \u6587\u4EF6\u540D: ${mediaInfo.name}`);
-    console.log(`   \u683C\u5F0F: ${mediaInfo.kind.toUpperCase()}`);
-    console.log(`   \u5206\u8FA8\u7387: ${mediaInfo.dimensions}`);
-    console.log(`   \u8D28\u91CF: ${mediaInfo.quality}`);
+    console.log(`   \u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(originalSize)}`);
     console.log(`   \u76EE\u6807\u683C\u5F0F: ${targetFormat.value.toUpperCase()}`);
     console.log(`   \u538B\u7F29\u6A21\u5F0F: ${isCompress ? "\u662F" : "\u5426"}`);
-    console.log("\u{1F4C1} \u751F\u6210\u8F93\u51FA\u6587\u4EF6\u8DEF\u5F84...");
     const outputPath = _VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
     console.log(`\u2705 \u8F93\u51FA\u8DEF\u5F84: ${outputPath}`);
-    console.log("\u{1F4CF} \u83B7\u53D6\u539F\u59CB\u6587\u4EF6\u5927\u5C0F...");
-    const originalSize = await _VideoConverter.getFileSize(mediaPath);
-    console.log(`\u2705 \u539F\u59CB\u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(originalSize)}`);
-    console.log("\u2699\uFE0F \u6784\u5EFA\u8F6C\u6362\u53C2\u6570...");
     const ffmpegArgs = this.buildFFmpegArgs(params, outputPath);
-    console.log("\u2705 \u8F6C\u6362\u53C2\u6570\u6784\u5EFA\u5B8C\u6210");
     console.log("\u{1F680} \u5F00\u59CB\u6267\u884C\u89C6\u9891\u8F6C\u6362...");
     const startTime = Date.now();
     try {
@@ -355,7 +525,6 @@ Error: ${stderr}`));
     if (compressionRatio > 0) {
       console.log(`\u{1F4C9} \u538B\u7F29\u6BD4\u4F8B: ${compressionRatio.toFixed(1)}%`);
     }
-    console.log("\u{1F4CB} \u751F\u6210\u8F6C\u6362\u62A5\u544A...");
     this.createPreview(
       mediaInfo,
       targetFormat,
@@ -365,7 +534,6 @@ Error: ${stderr}`));
       conversionTime,
       isCompress
     );
-    console.log("\u2705 \u8F6C\u6362\u62A5\u544A\u751F\u6210\u5B8C\u6210");
     console.log("\u{1F389} \u89C6\u9891\u8F6C\u6362\u6D41\u7A0B\u5168\u90E8\u5B8C\u6210!");
     return {
       media: outputPath
@@ -384,6 +552,15 @@ var ConversionError = class extends Error {
 async function main_default(params, context) {
   var _a;
   try {
+    if (!params.mediaInfo.size) {
+      try {
+        const stats = await fs2.stat(params.mediaPath);
+        params.mediaInfo.size = stats.size;
+      } catch (error) {
+        console.warn("\u65E0\u6CD5\u83B7\u53D6\u6587\u4EF6\u5927\u5C0F\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u503C 0");
+        params.mediaInfo.size = 0;
+      }
+    }
     const options = {
       customQuality: params.customQuality,
       customBitrate: params.customBitrate,
@@ -391,7 +568,6 @@ async function main_default(params, context) {
       hardwareAcceleration: params.hardwareAcceleration || "auto",
       preset: params.preset || "fast"
     };
-    console.log("input: ", params.targetFormat);
     const converter = new VideoConverter(context, options);
     return await converter.convert(params);
   } catch (error) {

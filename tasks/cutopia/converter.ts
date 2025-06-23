@@ -4,7 +4,7 @@ import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
 import path from "path"
 import * as fs from 'node:fs/promises';
 
-import { FORMAT_CONFIGS, ConversionOptions, VIDEO_FORMATS, BYTES_PER_GB, BYTES_PER_MB, QUALITY_THRESHOLDS } from "./constants"
+import { FORMAT_CONFIGS, ConversionOptions, VIDEO_FORMATS, BYTES_PER_GB, BYTES_PER_MB, FFMPEG_PARAMS, CODEC_COMPATIBILITY } from "./constants"
 import { VideoFormatOption } from "./inputRender"
 import { Outputs, Inputs } from "./main"
 
@@ -22,7 +22,7 @@ export class VideoConverter {
             hardwareAcceleration: 'auto',
             preset: 'fast',
             copyStreams: true,
-            threads: 0,
+            threads: Math.min(options.maxThreads || FFMPEG_PARAMS.THREAD_OPTIMIZATION.maxThreads, 4),
             ...options
         };
     }
@@ -72,170 +72,298 @@ export class VideoConverter {
         }
     }
 
+    private static getFileSizeFromMediaInfo(mediaInfo: MediaInfo): number {
+        if (typeof mediaInfo.size === 'number') {
+            return mediaInfo.size;
+        }
+        if (typeof mediaInfo.size === 'string') {
+            // 解析文件大小字符串，如 "1.5 GB", "500 MB"
+            const sizeMatch = mediaInfo.size.match(/^([\d.]+)\s*(GB|MB|KB|B)$/i);
+            if (sizeMatch) {
+                const value = parseFloat(sizeMatch[1]);
+                const unit = sizeMatch[2].toUpperCase();
+                switch (unit) {
+                    case 'GB': return Math.floor(value * BYTES_PER_GB);
+                    case 'MB': return Math.floor(value * BYTES_PER_MB);
+                    case 'KB': return Math.floor(value * 1000);
+                    case 'B': return Math.floor(value);
+                    default: return 0;
+                }
+            }
+        }
+        return 0;
+    }
+
     private static generateOutputPath(inputPath: string, targetFormat: string): string {
         return `${inputPath.replace(path.extname(inputPath), '')}-${Date.now()}${targetFormat}`;
     }
 
-    private getQualityPreset(quality: string): { crf: number; targetWidth?: number; targetHeight?: number } {
-        const { UHD, QHD, FHD, HD } = QUALITY_THRESHOLDS;
-
-        if (quality.includes('4K')) {
-            return { crf: 28, targetWidth: 1920, targetHeight: 1080 };
+    private getQualityPreset(quality: string, isCompress: boolean): { crf: number; nvenc_cq: number; qsv_q: number } {
+        if (!isCompress) {
+            return FFMPEG_PARAMS.QUALITY_PRESETS.lossless;
         }
 
-        if (quality.includes('2K')) {
-            return { crf: 26, targetWidth: 1920, targetHeight: 1080 };
+        if (quality.includes('4K') || quality.includes('UHD')) {
+            return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
         }
 
-        if (quality.includes('1080p')) {
-            return { crf: 28 };
+        if (quality.includes('2K') || quality.includes('QHD')) {
+            return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
         }
 
-        if (quality.includes('720p')) {
-            return { crf: 24 };
+        if (quality.includes('1080p') || quality.includes('FHD')) {
+            return FFMPEG_PARAMS.QUALITY_PRESETS.fast;
         }
 
-        return { crf: 24 };
+        if (quality.includes('720p') || quality.includes('HD')) {
+            return FFMPEG_PARAMS.QUALITY_PRESETS.fast;
+        }
+
+        return FFMPEG_PARAMS.QUALITY_PRESETS.medium;
     }
 
-    private canCopyStreams(inputFormat: string, outputFormat: string): boolean {
-        const compatibleFormats = ['.mp4', '.mov'];
-        return compatibleFormats.includes(inputFormat) && 
-               compatibleFormats.includes(outputFormat);
+    private canCopyAllStreams(mediaInfo: MediaInfo, targetFormat: string): boolean {
+        if (!this.options.copyStreams) return false;
+
+        const { videoCompatible, audioCompatible } = this.checkStreamCompatibility(mediaInfo, targetFormat);
+
+        console.log(`🔍 完全流复制检查:`);
+        console.log(`   视频兼容: ${videoCompatible ? '✅' : '❌'}`);
+        console.log(`   音频兼容: ${audioCompatible ? '✅' : '❌'}`);
+        console.log(`   可完全复制: ${videoCompatible && audioCompatible ? '✅' : '❌'}`);
+
+        return videoCompatible && audioCompatible;
+    }
+
+    private checkStreamCompatibility(mediaInfo: MediaInfo, targetFormat: string): {
+        videoCompatible: boolean;
+        audioCompatible: boolean;
+        videoCodec: string | null;
+        audioCodec: string | null;
+    } {
+        const targetFormatKey = targetFormat.substring(1);
+        const targetConfig = FORMAT_CONFIGS[targetFormatKey.toLowerCase() as keyof typeof FORMAT_CONFIGS];
+
+        if (!targetConfig) {
+            return {
+                videoCompatible: false,
+                audioCompatible: false,
+                videoCodec: null,
+                audioCodec: null
+            };
+        }
+
+        // 提取编码格式
+        const videoCodec = this.extractVideoCodec(mediaInfo);
+        const audioCodec = this.extractAudioCodec(mediaInfo);
+
+        // 如果无法确定编码格式，不使用流复制
+        if (!videoCodec || !audioCodec) {
+            return {
+                videoCompatible: false,
+                audioCompatible: false,
+                videoCodec,
+                audioCodec
+            };
+        }
+
+        // 检查编码兼容性
+        const videoCompatible = this.isCodecCompatible(videoCodec, targetFormatKey, 'video');
+        const audioCompatible = this.isCodecCompatible(audioCodec, targetFormatKey, 'audio');
+
+        return {
+            videoCompatible,
+            audioCompatible,
+            videoCodec,
+            audioCodec
+        };
+    }
+
+    private addVideoCodecArgs(
+        args: string[],
+        formatConfig: any,
+        videoCompatible: boolean,
+        isCompress: boolean,
+        mediaInfo: MediaInfo
+    ): void {
+        if (videoCompatible && !isCompress) {
+            console.log("🎥 视频流复制模式");
+            args.push('-c:v', 'copy');
+        } else {
+            console.log("🎥 视频重新编码");
+            const videoCodecName = formatConfig.video;
+            args.push('-c:v', videoCodecName);
+
+            // 添加视频质量参数
+            this.addVideoQualityArgs(args, videoCodecName, isCompress, mediaInfo);
+        }
+    }
+
+    private addAudioCodecArgs(
+        args: string[],
+        formatConfig: any,
+        audioCompatible: boolean,
+        isCompress: boolean
+    ): void {
+        if (audioCompatible && !isCompress) {
+            console.log("🎵 音频流复制模式");
+            args.push('-c:a', 'copy');
+        } else {
+            console.log("🎵 音频重新编码");
+            args.push('-c:a', formatConfig.audio);
+
+            // 添加音频比特率
+            const audioBitrate = this.options.customBitrate || FFMPEG_PARAMS.AUDIO_BITRATES.medium;
+            args.push('-b:a', audioBitrate);
+        }
+    }
+
+    private addVideoQualityArgs(
+        args: string[],
+        videoCodecName: string,
+        isCompress: boolean,
+        mediaInfo: MediaInfo
+    ): void {
+        const qualityPreset = this.getQualityPreset(mediaInfo.quality, isCompress);
+
+        if (isCompress) {
+            // 分辨率缩放
+            const { width, height } = VideoConverter.parseDimensions(mediaInfo.dimensions);
+            if (width > 1920 || height > 1080) {
+                args.push('-vf',
+                    'scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2'
+                );
+            }
+        }
+
+        // 质量设置
+        const customQuality = this.options.customQuality;
+        let qualityValue: number;
+
+        if (videoCodecName.includes('nvenc')) {
+            qualityValue = customQuality || qualityPreset.nvenc_cq;
+            args.push('-cq', qualityValue.toString());
+            args.push('-preset', 'fast');
+        } else if (videoCodecName.includes('qsv')) {
+            qualityValue = customQuality || qualityPreset.qsv_q;
+            args.push('-q', qualityValue.toString());
+            args.push('-preset', 'fast');
+        } else {
+            qualityValue = customQuality || qualityPreset.crf;
+            args.push('-crf', qualityValue.toString());
+            args.push('-preset', this.options.preset!);
+        }
+    }
+
+    private extractVideoCodec(mediaInfo: MediaInfo): string | null {
+        // 优先从 videoCodec 字段获取
+        if (mediaInfo.videoCodec) {
+            return mediaInfo.videoCodec.toLowerCase();
+        }
+
+        // 从 codecs 字段解析
+        if (mediaInfo.codecs) {
+            const codecs = mediaInfo.codecs.toLowerCase();
+            if (codecs.includes('h264') || codecs.includes('avc')) return 'h264';
+            if (codecs.includes('h265') || codecs.includes('hevc')) return 'h265';
+            if (codecs.includes('vp9')) return 'vp9';
+            if (codecs.includes('vp8')) return 'vp8';
+            if (codecs.includes('wmv')) return 'wmv2';
+        }
+
+        // 从容器格式推断
+        const containerFormat = mediaInfo.containerFormat || mediaInfo.kind;
+        if (containerFormat) {
+            const format = containerFormat.toLowerCase();
+            if (format === 'webm') return 'vp9'; // webm 通常使用 vp9
+            if (format === 'wmv') return 'wmv2';
+        }
+
+        return null;
+    }
+
+    private extractAudioCodec(mediaInfo: MediaInfo): string | null {
+        // 优先从 audioCodec 字段获取
+        if (mediaInfo.audioCodec) {
+            return mediaInfo.audioCodec.toLowerCase();
+        }
+
+        // 从 codecs 字段解析
+        if (mediaInfo.codecs) {
+            const codecs = mediaInfo.codecs.toLowerCase();
+            if (codecs.includes('aac')) return 'aac';
+            if (codecs.includes('mp3')) return 'mp3';
+            if (codecs.includes('opus')) return 'opus';
+            if (codecs.includes('vorbis')) return 'vorbis';
+            if (codecs.includes('wmav2')) return 'wmav2';
+        }
+
+        // 从容器格式推断
+        const containerFormat = mediaInfo.containerFormat || mediaInfo.kind;
+        if (containerFormat) {
+            const format = containerFormat.toLowerCase();
+            if (format === 'webm') return 'opus'; // webm 通常使用 opus
+            if (format === 'wmv') return 'wmav2';
+        }
+
+        return null;
+    }
+
+    private isCodecCompatible(codec: string, targetFormat: string, type: 'video' | 'audio'): boolean {
+        const compatibility = CODEC_COMPATIBILITY[type];
+        const codecFormats = compatibility[codec as keyof typeof compatibility] as string;
+        return codecFormats ? codecFormats.includes(targetFormat) : false;
     }
 
     private buildFFmpegArgs(params: Inputs, outputPath: string): string[] {
         const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
         const args: string[] = [];
 
-        // 1. 输入优化
+        // TODO：硬件加速
+        // 输入设置
         args.push(
-            '-fflags', '+fastseek+genpts',
-            '-probesize', '32M',
-            '-analyzeduration', '10M'
+            '-fflags', FFMPEG_PARAMS.INPUT_OPTIMIZATION.fflags,
+            '-probesize', FFMPEG_PARAMS.INPUT_OPTIMIZATION.probesize,
+            '-analyzeduration', FFMPEG_PARAMS.INPUT_OPTIMIZATION.analyzeduration
         );
-
-        // 2. 硬件加速设置（在输入之前）
-        // if (this.options.hardwareAcceleration && Boolean(this.options.hardwareAcceleration) !== false) {
-        //     if (this.options.hardwareAcceleration === 'nvidia') {
-        //         args.push('-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda');
-        //     } else if (this.options.hardwareAcceleration === 'intel') {
-        //         args.push('-hwaccel', 'qsv');
-        //     } else {
-        //         args.push('-hwaccel', 'auto');
-        //     }
-        // }
 
         args.push('-i', mediaPath!);
 
-        const kind = targetFormat.value.substring(1);
-        const formatConfig = FORMAT_CONFIGS[kind.toLowerCase() as keyof typeof FORMAT_CONFIGS];
-        
+        const targetFormatKey = targetFormat!.value.substring(1);
+        const formatConfig = FORMAT_CONFIGS[targetFormatKey.toLowerCase() as keyof typeof FORMAT_CONFIGS];
+
         if (!formatConfig) {
             throw new Error(`Unsupported format: ${targetFormat.value}`);
         }
 
-        // 3. 检查是否可以直接复制流（最快）
-        if (this.options.copyStreams && !isCompress && 
-            this.canCopyStreams(path.extname(mediaPath!), targetFormat.value)) {
-            console.log("🚀 使用流复制模式，速度最快");
+        // 检查流兼容性，判断是否可以直接复制流
+        const streamCompatibility = this.checkStreamCompatibility(mediaInfo, targetFormat!.value);
+        const { videoCompatible, audioCompatible, videoCodec, audioCodec } = streamCompatibility;
+
+        if (this.canCopyAllStreams(mediaInfo, targetFormat!.value) && !isCompress) {
+            console.log("🚀 使用完全流复制模式");
             args.push('-c', 'copy');
         } else {
-            // 4. 选择编码器（硬件优先）
-            let videoCodec = formatConfig.video;
-            
-            // if (this.options.hardwareAcceleration && Boolean(this.options.hardwareAcceleration) !== false) {
-            //     if (this.options.hardwareAcceleration === 'nvidia' && formatConfig.videoHW) {
-            //         videoCodec = formatConfig.videoHW;
-            //         console.log("🚀 使用NVIDIA硬件加速");
-            //     } else if (this.options.hardwareAcceleration === 'intel' && formatConfig.videoQSV) {
-            //         videoCodec = formatConfig.videoQSV;
-            //         console.log("🚀 使用Intel硬件加速");
-            //     } else if (formatConfig.videoHW) {
-            //         videoCodec = formatConfig.videoHW; // 默认尝试NVIDIA
-            //         console.log("🚀 尝试使用硬件加速");
-            //     }
-            // }
-
-            args.push('-c:v', videoCodec);
-
-            // 5. 音频处理（优先复制）
-            if (!isCompress) {
-                args.push('-c:a', 'copy'); // 不压缩时直接复制音频
-            } else {
-                args.push('-c:a', formatConfig.audio);
-            }
-
-            // 6. 质量和压缩设置
-            if (isCompress) {
-                const { width, height } = VideoConverter.parseDimensions(mediaInfo.dimensions);
-                const qualityPreset = this.getQualityPreset(mediaInfo.quality);
-
-                // 缩放设置
-                if (qualityPreset.targetWidth && qualityPreset.targetHeight) {
-                    if (width > qualityPreset.targetWidth || height > qualityPreset.targetHeight) {
-                        args.push('-vf',
-                            `scale=${qualityPreset.targetWidth}:${qualityPreset.targetHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`
-                        );
-                    }
-                }
-
-                // 质量设置（硬件编码器使用不同参数）
-                const crf = this.options.customQuality || qualityPreset.crf;
-                if (videoCodec.includes('nvenc')) {
-                    args.push('-crf', crf.toString()); // 更新到最行版---NVIDIA使用CQ
-                } else if (videoCodec.includes('qsv')) {
-                    args.push('-q', crf.toString()); // Intel QSV使用q
-                } else {
-                    args.push('-crf', crf.toString()); // 软件编码使用CRF
-                }
-
-                // 音频比特率
-                if (!args.includes('-c:a') || !args[args.indexOf('-c:a') + 1].includes('copy')) {
-                    const audioBitrate = this.options.customBitrate || '128k';
-                    args.push('-b:a', audioBitrate);
-                }
-            } else {
-                // 高质量设置
-                const crf = this.options.customQuality || 18;
-                if (videoCodec.includes('nvenc')) {
-                    args.push('-crf', crf.toString());
-                } else if (videoCodec.includes('qsv')) {
-                    args.push('-q', crf.toString());
-                } else {
-                    args.push('-crf', crf.toString());
-                }
-            }
-
-            // 7. 预设设置（硬件编码器使用不同预设）
-        //     if (videoCodec.includes('nvenc')) {
-        //         args.push('-preset', 'fast'); // NVIDIA预设
-        //     } else if (videoCodec.includes('qsv')) {
-        //         args.push('-preset', 'fast'); // Intel预设
-        //     } else {
-        //         args.push('-preset', this.options.preset!); // 软件编码预设
-        //     }
+            // 分别处理视频和音频编码
+            this.addVideoCodecArgs(args, formatConfig, videoCompatible, isCompress, mediaInfo);
+            this.addAudioCodecArgs(args, formatConfig, audioCompatible, isCompress);
         }
 
-        // 8. 线程优化
-        if (this.options.threads !== undefined) {
-            args.push('-threads', this.options.threads.toString());
-        }
+        // 线程设置
+        const maxThreads = this.options.threads || FFMPEG_PARAMS.THREAD_OPTIMIZATION.defaultThreads;
+        args.push('-threads', maxThreads.toString());
 
-        // 9. 元数据处理
+        // 元数据处理
         if (this.options.preserveMetadata) {
             args.push('-map_metadata', '0');
-        } else {
-            args.push('-map_metadata', '-1');
         }
 
-        // 10. 输出优化
+        // 输出设置
         args.push(
-            '-movflags', '+faststart', // 优化streaming
-            '-pix_fmt', 'yuv420p',     // 兼容性
-            '-y', outputPath            // 覆盖输出文件
+            '-movflags', '+faststart',
+            '-pix_fmt', formatConfig.pixelFormat || 'yuv420p',
+            '-y', outputPath
         );
-
         console.log("🔧 FFmpeg参数:", args.join(' '));
         return args;
     }
@@ -247,9 +375,9 @@ export class VideoConverter {
                 const hours = parseInt(durationMatch[1], 10);
                 const minutes = parseInt(durationMatch[2], 10);
                 const seconds = parseFloat(durationMatch[3]);
-                
+
                 this.totalDuration = hours * 3600 + minutes * 60 + seconds;
-                console.log(`📏 从FFmpeg输出解析到视频时长: ${this.totalDuration.toFixed(2)}秒`);
+                console.log(`📏 视频时长: ${this.totalDuration.toFixed(2)}秒`);
             }
         }
     }
@@ -349,36 +477,29 @@ export class VideoConverter {
     async convert(params) {
         console.log("🎬 开始视频转换流程...");
 
-        // 验证输入参数
-        console.log("📋 验证输入参数...");
         VideoConverter.validateInputs(params);
         console.log("✅ 参数验证通过");
 
         const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
 
+        // 获取文件大小（优先从 mediaInfo，然后从文件系统）
+        let originalSize = VideoConverter.getFileSizeFromMediaInfo(mediaInfo);
+        if (originalSize === 0) {
+            originalSize = await VideoConverter.getFileSize(mediaPath!);
+            // 更新 mediaInfo 中的 size
+            mediaInfo.size = originalSize;
+        }
+
         console.log("📂 输入文件信息:");
         console.log(`   文件路径: ${mediaPath}`);
-        console.log(`   文件名: ${mediaInfo.name}`);
-        console.log(`   格式: ${mediaInfo.kind.toUpperCase()}`);
-        console.log(`   分辨率: ${mediaInfo.dimensions}`);
-        console.log(`   质量: ${mediaInfo.quality}`);
-        console.log(`   目标格式: ${targetFormat.value.toUpperCase()}`);
+        console.log(`   文件大小: ${VideoConverter.formatFileSize(originalSize)}`);
+        console.log(`   目标格式: ${targetFormat!.value.toUpperCase()}`);
         console.log(`   压缩模式: ${isCompress ? '是' : '否'}`);
 
-        // 生成输出路径
-        console.log("📁 生成输出文件路径...");
         const outputPath = VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
         console.log(`✅ 输出路径: ${outputPath}`);
 
-        // 获取原始文件大小
-        console.log("📏 获取原始文件大小...");
-        const originalSize = await VideoConverter.getFileSize(mediaPath);
-        console.log(`✅ 原始文件大小: ${VideoConverter.formatFileSize(originalSize)}`);
-
-        // 构建FFmpeg参数
-        console.log("⚙️ 构建转换参数...");
         const ffmpegArgs = this.buildFFmpegArgs(params, outputPath);
-        console.log("✅ 转换参数构建完成");
 
         // 开始转换
         console.log("🚀 开始执行视频转换...");
@@ -397,7 +518,6 @@ export class VideoConverter {
         console.log(`⏱️ 转换耗时: ${(conversionTime / 1000).toFixed(1)}秒`);
 
         // 获取输出文件大小
-        console.log("📊 获取输出文件信息...");
         const outputSize = await VideoConverter.getFileSize(outputPath);
         const compressionRatio = originalSize > 0 ? ((originalSize - outputSize) / originalSize * 100) : 0;
 
@@ -407,7 +527,6 @@ export class VideoConverter {
         }
 
         // 创建预览
-        console.log("📋 生成转换报告...");
         this.createPreview(
             mediaInfo,
             targetFormat,
@@ -417,7 +536,7 @@ export class VideoConverter {
             conversionTime,
             isCompress
         );
-        console.log("✅ 转换报告生成完成");
+
         console.log("🎉 视频转换流程全部完成!");
         return {
             media: outputPath

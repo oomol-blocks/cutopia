@@ -6,47 +6,105 @@ export const VIDEO_FORMATS = [
 export const FORMAT_CONFIGS = {
     mp4: { 
         video: 'libx264', 
-        videoHW: 'h264_nvenc', // NVIDIA硬件加速
-        videoQSV: 'h264_qsv',  // Intel硬件加速
+        videoHW: 'h264_nvenc', 
+        videoQSV: 'h264_qsv',  
         audio: 'aac', 
-        container: 'mp4' 
+        container: 'mp4',
+        pixelFormat: 'yuv420p'
     },
     avi: { 
         video: 'libx264', 
         videoHW: 'h264_nvenc',
         videoQSV: 'h264_qsv',
         audio: 'mp3', 
-        container: 'avi' 
+        container: 'avi',
+        pixelFormat: 'yuv420p'
     },
     mkv: { 
         video: 'libx264', 
         videoHW: 'h264_nvenc',
         videoQSV: 'h264_qsv',
         audio: 'aac', 
-        container: 'matroska' 
+        container: 'matroska',
+        pixelFormat: 'yuv420p'
     },
     mov: { 
         video: 'libx264', 
         videoHW: 'h264_nvenc',
         videoQSV: 'h264_qsv',
         audio: 'aac', 
-        container: 'mov' 
+        container: 'mov',
+        pixelFormat: 'yuv420p'
     },
-    wmv: { video: 'wmv2', audio: 'wmav2', container: 'asf' },
-    webm: { video: 'libvpx-vp9', audio: 'libopus', container: 'webm' },
+    wmv: { 
+        video: 'wmv2', 
+        audio: 'wmav2', 
+        container: 'asf',
+        pixelFormat: 'yuv420p'
+    },
+    webm: { 
+        video: 'libvpx-vp9', 
+        audio: 'libopus', 
+        container: 'webm',
+        pixelFormat: 'yuv420p'
+    },
     flv: { 
         video: 'libx264', 
         videoHW: 'h264_nvenc',
         videoQSV: 'h264_qsv',
         audio: 'aac', 
-        container: 'flv' 
+        container: 'flv',
+        pixelFormat: 'yuv420p'
     }
 } as const;
 
-export const HARDWARE_ACCELERATION = {
-    nvidia: { decoder: 'h264_cuvid', encoder: 'h264_nvenc' },
-    intel: { decoder: 'h264_qsv', encoder: 'h264_qsv' },
-    amd: { decoder: 'h264_amf', encoder: 'h264_amf' }
+export const FFMPEG_PARAMS = {
+    INPUT_OPTIMIZATION: {
+        fflags: '+fastseek+genpts',
+        probesize: '16M',      // 从32M降低到16M
+        analyzeduration: '5M'  // 从10M降低到5M
+    },
+    THREAD_OPTIMIZATION: {
+        maxThreads: 4,         // 限制最大线程数
+        defaultThreads: 2      // 默认线程数
+    },
+    QUALITY_PRESETS: {
+        fast: { crf: 28, nvenc_cq: 28, qsv_q: 28 },
+        medium: { crf: 24, nvenc_cq: 24, qsv_q: 24 },
+        high: { crf: 20, nvenc_cq: 20, qsv_q: 20 },
+        lossless: { crf: 18, nvenc_cq: 18, qsv_q: 18 }
+    },
+    AUDIO_BITRATES: {
+        low: '96k',
+        medium: '128k',
+        high: '192k',
+        lossless: '320k'
+    },
+    PRESETS: {
+        software: ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+        nvenc: ['fast', 'medium', 'slow'],
+        qsv: ['veryfast', 'faster', 'fast', 'medium', 'slow']
+    }
+} as const;
+
+export const CODEC_COMPATIBILITY = {
+    // 视频编码兼容性
+    video: {
+        h264: ['mp4', 'avi', 'mkv', 'mov', 'flv'],
+        h265: ['mp4', 'mkv', 'mov'],
+        vp8: ['webm'],
+        vp9: ['webm', 'mkv'],
+        wmv2: ['wmv'],
+        xvid: ['avi']
+    },
+    // 音频编码兼容性
+    audio: {
+        aac: ['mp4', 'mkv', 'mov', 'flv'],
+        mp3: ['avi', 'mkv'],
+        opus: ['webm', 'mkv'],
+        vorbis: ['webm', 'mkv'],
+        wmav2: ['wmv']
+    }
 } as const;
 
 export const BYTES_PER_GB = 1_000_000_000;
@@ -60,31 +118,6 @@ export const QUALITY_THRESHOLDS = {
     HD: { width: 1280, height: 720, bitrate: 2 }
 } as const;
 
-export const COLOR_MAPPINGS = {
-    bt709: '1',
-    bt2020: '9',
-    smpte170m: '6',
-    bt470bg: '5'
-} as const;
-
-export const CODEC_MAPPINGS = {
-    video: {
-        h264: 'H.264',
-        hevc: 'H.265',
-        h265: 'H.265',
-        vp9: 'VP9',
-        vp8: 'VP8',
-        av1: 'AV1'
-    },
-    audio: {
-        aac: 'MPEG-4 AAC',
-        mp3: 'MPEG-1 Layer 3',
-        ac3: 'Dolby Digital',
-        opus: 'Opus',
-        vorbis: 'Vorbis'
-    }
-} as const;
-
 export interface ConversionOptions {
     customQuality?: number;
     customBitrate?: string;
@@ -93,4 +126,5 @@ export interface ConversionOptions {
     preset?: 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
     copyStreams?: boolean; // 直接复制流，最快的转换方式
     threads?: number; // 线程数
+    maxThreads?: number;
 }

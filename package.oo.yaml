@@ -14,4 +14,4 @@ contributes:
           ui:options:
             title: TargetFormat
 dependencies:
-  {}
+  oomol-preview: 0.0.5
