@@ -94,6 +94,7 @@ export class VideoConverter {
         return 0;
     }
 
+    // TODO: 用户可以自定义
     private static generateOutputPath(inputPath: string, targetFormat: string): string {
         return `${inputPath.replace(path.extname(inputPath), '')}-${Date.now()}${targetFormat}`;
     }

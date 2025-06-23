@@ -11,8 +11,8 @@ nodes:
         value: true
       - handle: targetFormat
         value:
-          name: MP4
-          value: .mp4
+          name: WEBM
+          value: .webm
       - handle: mediaInfo
         from_node:
           - node_id: get-media-info#1
@@ -21,7 +21,7 @@ nodes:
     task: self::get-media-info
     inputs_from:
       - handle: mediaPath
-        value: /oomol-driver/oomol-storage/vboard-2025-06-23754ed0.webm
+        value: /oomol-driver/oomol-storage/1601363746034307.mp4
   - node_id: video_preview#1
     title: "Video preview #1"
     inputs_from:

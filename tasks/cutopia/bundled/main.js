@@ -210,6 +210,7 @@ var VideoConverter = class _VideoConverter {
     }
     return 0;
   }
+  // TODO: 用户可以自定义
   static generateOutputPath(inputPath, targetFormat) {
     return `${inputPath.replace(path.extname(inputPath), "")}-${Date.now()}${targetFormat}`;
   }

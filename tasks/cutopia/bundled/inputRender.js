@@ -17861,26 +17861,12 @@ function targetFormat(dom, context) {
   };
 }
 function VideoFormatSelector() {
+  const context = window.inputRenderContext;
+  const cacheVal = context?.store?.value$?.value;
   const [videoFormats] = (0, import_react9.useState)(VideoFormatConfig.getAllFormats());
   const [selectedVideoFormat, setSelectedVideoFormat] = (0, import_react9.useState)(
-    VideoFormatConfig.getDefaultFormat()
+    cacheVal ? cacheVal.value : VideoFormatConfig.getDefaultFormat()
   );
-  const context = window.inputRenderContext;
-  const readonly = !context?.store?.context?.canEditValue;
-  const initialValue = context?.store?.value$?.value;
-  const selectOptions = (0, import_react9.useMemo)(() => videoFormats.map((format) => ({
-    value: format.value,
-    label: VideoFormatConfig.formatLabel(format.value)
-  })), [videoFormats]);
-  const currentValue = (0, import_react9.useMemo)(() => ({
-    value: selectedVideoFormat,
-    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
-  }), [selectedVideoFormat]);
-  (0, import_react9.useEffect)(() => {
-    if (initialValue?.value && VideoFormatConfig.isValidFormat(initialValue.value)) {
-      setSelectedVideoFormat(initialValue.value);
-    }
-  }, [initialValue]);
   (0, import_react9.useEffect)(() => {
     const formatOption = {
       name: VideoFormatConfig.getFormatName(selectedVideoFormat),
@@ -17893,13 +17879,20 @@ function VideoFormatSelector() {
       setSelectedVideoFormat(selectedOption.value);
     }
   };
+  const selectOptions = videoFormats.map((format) => ({
+    value: format.value,
+    label: VideoFormatConfig.formatLabel(format.value)
+  }));
+  const currentValue = {
+    value: selectedVideoFormat,
+    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
+  };
   return /* @__PURE__ */ import_react9.default.createElement("div", { className: "video-container" }, /* @__PURE__ */ import_react9.default.createElement(
     StateManagedSelect$1,
     {
       value: currentValue,
       options: selectOptions,
       onChange: handleFormatChange,
-      isDisabled: readonly,
       className: "react-select-container",
       classNamePrefix: "react-select",
       unstyled: true,

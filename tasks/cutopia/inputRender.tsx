@@ -52,30 +52,12 @@ export function targetFormat(dom: HTMLElement, context: InputRenderContext) {
 
 function VideoFormatSelector() {
   // TODO：根据用户输入的类型，判断显示哪些可转换的类型
+  const context = (window as any).inputRenderContext as InputRenderContext;
+  const cacheVal = context?.store?.value$?.value as VideoFormatOption | undefined;
   const [videoFormats] = useState<VideoFormatOption[]>(VideoFormatConfig.getAllFormats());
   const [selectedVideoFormat, setSelectedVideoFormat] = useState<VideoFormatType>(
-    VideoFormatConfig.getDefaultFormat()
+    cacheVal ? cacheVal.value : VideoFormatConfig.getDefaultFormat()
   );
-
-  const context = (window as any).inputRenderContext as InputRenderContext;
-  const readonly = !context?.store?.context?.canEditValue;
-  const initialValue = context?.store?.value$?.value as VideoFormatOption | undefined;
-
-  const selectOptions: SelectOption[] = useMemo(() => videoFormats.map((format) => ({
-    value: format.value,
-    label: VideoFormatConfig.formatLabel(format.value),
-  })), [videoFormats])
-
-  const currentValue: SelectOption = useMemo(() => ({
-    value: selectedVideoFormat,
-    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
-  }), [selectedVideoFormat]);
-
-  useEffect(() => {
-    if (initialValue?.value && VideoFormatConfig.isValidFormat(initialValue.value)) {
-      setSelectedVideoFormat(initialValue.value);
-    }
-  }, [initialValue]);
 
   useEffect(() => {
     const formatOption: VideoFormatOption = {
@@ -92,13 +74,22 @@ function VideoFormatSelector() {
     }
   };
 
+  const selectOptions: SelectOption[] = videoFormats.map((format) => ({
+    value: format.value,
+    label: VideoFormatConfig.formatLabel(format.value),
+  }));
+
+  const currentValue: SelectOption = {
+    value: selectedVideoFormat,
+    label: VideoFormatConfig.formatLabel(selectedVideoFormat)
+  };
+
   return (
     <div className="video-container">
       <Select<SelectOption>
         value={currentValue}
         options={selectOptions}
         onChange={handleFormatChange}
-        isDisabled={readonly}
         className="react-select-container"
         classNamePrefix="react-select"
         unstyled
