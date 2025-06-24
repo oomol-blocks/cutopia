@@ -39,6 +39,11 @@ inputs_def:
           type: string
         dimensions:
           type: string
+  - handle: outputDir
+    description: Input
+    json_schema:
+      type: string
+      ui:widget: dir
   - handle: isCompress
     json_schema:
       type: boolean

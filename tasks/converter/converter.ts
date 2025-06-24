@@ -94,9 +94,13 @@ export class VideoConverter {
         return 0;
     }
 
-    // TODO: 用户可以自定义
     private static generateOutputPath(inputPath: string, targetFormat: string): string {
         return `${inputPath.replace(path.extname(inputPath), '')}-${Date.now()}${targetFormat}`;
+    }
+
+    private static generateOutputPathFromDir(inputPath: string, outputDir: string, targetExtension: string): string {
+        const baseName = path.basename(inputPath, path.extname(inputPath));
+        return path.join(outputDir, `${baseName}-${Date.now()}${targetExtension}`);
     }
 
     private getQualityPreset(quality: string, isCompress: boolean): { crf: number; nvenc_cq: number; qsv_q: number } {
@@ -439,8 +443,8 @@ export class VideoConverter {
      * Create preview of the current task
      */
     private createPreview(
-        mediaInfo: MediaInfo,
-        targetFormat: VideoFormatOption,
+        inputPath: string,
+        outputPath: string,
         originalSize: number,
         outputSize: number,
         compressionRatio: number,
@@ -453,14 +457,12 @@ export class VideoConverter {
 
         const previewRows = [
             ["Status", "✅ Conversion Successful"],
-            ["Original File", `${mediaInfo.name} (${mediaInfo.kind.toUpperCase()})`],
-            ["Target Format", targetFormat.value.toLowerCase()],
+            ["Original File", inputPath],
+            ["Target File", outputPath],
             ["Original Size", VideoConverter.formatFileSize(originalSize)],
             ["Output Size", VideoConverter.formatFileSize(outputSize) + compressionInfo],
             ["Conversion Time", `${(conversionTime / 1000).toFixed(1)}s`],
             ...(compressionRatio > 0 ? [["Compression Ratio", `${compressionRatio.toFixed(1)}%`]] : []),
-            ["Quality", mediaInfo.quality],
-            ["Dimensions", mediaInfo.dimensions]
         ];
 
         this.context.preview({
@@ -481,7 +483,7 @@ export class VideoConverter {
         VideoConverter.validateInputs(params);
         console.log("✅ 参数验证通过");
 
-        const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
+        const { mediaPath, mediaInfo, targetFormat, isCompress, outputDir } = params;
 
         // 获取文件大小（优先从 mediaInfo，然后从文件系统）
         let originalSize = VideoConverter.getFileSizeFromMediaInfo(mediaInfo);
@@ -497,8 +499,14 @@ export class VideoConverter {
         console.log(`   目标格式: ${targetFormat!.value.toUpperCase()}`);
         console.log(`   压缩模式: ${isCompress ? '是' : '否'}`);
 
-        const outputPath = VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
-        console.log(`✅ 输出路径: ${outputPath}`);
+        let outputPath = ""
+        if (!outputDir) {
+            outputPath = VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
+            console.warn(`✅ 输出路径未指定，将使用默认路径: ${outputPath}`);
+        } else {
+            outputPath = VideoConverter.generateOutputPathFromDir(mediaPath, outputDir, targetFormat.value)
+            console.log(`✅ 输出路径: ${outputPath}`);
+        }
 
         const ffmpegArgs = this.buildFFmpegArgs(params, outputPath);
 
@@ -529,8 +537,8 @@ export class VideoConverter {
 
         // 创建预览
         this.createPreview(
-            mediaInfo,
-            targetFormat,
+            mediaPath,
+            outputPath,
             originalSize,
             outputSize,
             compressionRatio,

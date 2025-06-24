@@ -1,4 +1,4 @@
-version: 0.0.1
+version: 0.0.3
 scripts:
   # Script executed when the container is first loaded
   # eg: bootstrap: poetry add pandas
@@ -19,8 +19,5 @@ name: cutopia
 description: Cutopia
 displayName: Cutopia
 repository: https://github.com/oomol-blocks/cutopia
-releaseNotes: |-
-  1. get media info
-  2. convert video
-  3. preview video
+releaseNotes: fix build path
 icon: ./icon.png

@@ -10,10 +10,10 @@
       }
     },
     "get-media-info#1": {
-      "contentWidth": 450,
+      "contentWidth": 350,
       "rfNode": {
         "position": {
-          "x": -104.83333333333327,
+          "x": -4.8333333333332575,
           "y": 188.00413131713867
         }
       }

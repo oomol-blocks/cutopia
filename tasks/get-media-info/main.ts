@@ -38,7 +38,7 @@ export default async function (
 
         // Create preview table
         const previewRows = [
-            ["Name", mediaInfo.name],
+            ["File Name", mediaInfo.name],
             ["Kind", mediaInfo.kind],
             ["Size", mediaInfo.size],
             ["Dimensions", mediaInfo.dimensions],
@@ -79,15 +79,6 @@ export default async function (
 };
 
 class MediaAnalyzer {
-    private static safeEval(frameRate: string): number {
-        try {
-            const [num, den] = frameRate.split('/').map(Number);
-            return den ? num / den : num;
-        } catch {
-            return 0;
-        }
-    }
-
     private static formatFileSize(bytes: number): string {
         if (bytes >= BYTES_PER_GB) {
             return `${(bytes / BYTES_PER_GB).toFixed(2)} GB`;

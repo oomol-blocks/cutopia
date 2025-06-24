@@ -7,16 +7,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 
-// tasks/cutopia/main.ts
+// tasks/converter/main.ts
 import * as fs2 from "node:fs/promises";
 
-// tasks/cutopia/converter.ts
+// tasks/converter/converter.ts
 import { spawn } from "child_process";
 import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
 import path from "path";
 import * as fs from "node:fs/promises";
 
-// tasks/cutopia/constants.ts
+// tasks/converter/constants.ts
 var VIDEO_FORMATS = [
   ".mp4",
   ".avi",
@@ -134,7 +134,7 @@ var CODEC_COMPATIBILITY = {
 var BYTES_PER_GB = 1e9;
 var BYTES_PER_MB = 1e6;
 
-// tasks/cutopia/converter.ts
+// tasks/converter/converter.ts
 var VideoConverter = class _VideoConverter {
   constructor(context, options = {}) {
     this.totalDuration = 0;
@@ -210,9 +210,12 @@ var VideoConverter = class _VideoConverter {
     }
     return 0;
   }
-  // TODO: 用户可以自定义
   static generateOutputPath(inputPath, targetFormat) {
     return `${inputPath.replace(path.extname(inputPath), "")}-${Date.now()}${targetFormat}`;
+  }
+  static generateOutputPathFromDir(inputPath, outputDir, targetExtension) {
+    const baseName = path.basename(inputPath, path.extname(inputPath));
+    return path.join(outputDir, `${baseName}-${Date.now()}${targetExtension}`);
   }
   getQualityPreset(quality, isCompress) {
     if (!isCompress) {
@@ -466,18 +469,16 @@ Error: ${stderr}`));
   /**
    * Create preview of the current task
    */
-  createPreview(mediaInfo, targetFormat, originalSize, outputSize, compressionRatio, conversionTime, isCompress) {
+  createPreview(inputPath, outputPath, originalSize, outputSize, compressionRatio, conversionTime, isCompress) {
     const compressionInfo = isCompress && compressionRatio > 0 ? ` (compressed ${compressionRatio.toFixed(1)}%)` : "";
     const previewRows = [
       ["Status", "\u2705 Conversion Successful"],
-      ["Original File", `${mediaInfo.name} (${mediaInfo.kind.toUpperCase()})`],
-      ["Target Format", targetFormat.value.toLowerCase()],
+      ["Original File", inputPath],
+      ["Target File", outputPath],
       ["Original Size", _VideoConverter.formatFileSize(originalSize)],
       ["Output Size", _VideoConverter.formatFileSize(outputSize) + compressionInfo],
       ["Conversion Time", `${(conversionTime / 1e3).toFixed(1)}s`],
-      ...compressionRatio > 0 ? [["Compression Ratio", `${compressionRatio.toFixed(1)}%`]] : [],
-      ["Quality", mediaInfo.quality],
-      ["Dimensions", mediaInfo.dimensions]
+      ...compressionRatio > 0 ? [["Compression Ratio", `${compressionRatio.toFixed(1)}%`]] : []
     ];
     this.context.preview({
       type: "table",
@@ -494,7 +495,7 @@ Error: ${stderr}`));
     console.log("\u{1F3AC} \u5F00\u59CB\u89C6\u9891\u8F6C\u6362\u6D41\u7A0B...");
     _VideoConverter.validateInputs(params);
     console.log("\u2705 \u53C2\u6570\u9A8C\u8BC1\u901A\u8FC7");
-    const { mediaPath, mediaInfo, targetFormat, isCompress } = params;
+    const { mediaPath, mediaInfo, targetFormat, isCompress, outputDir } = params;
     let originalSize = _VideoConverter.getFileSizeFromMediaInfo(mediaInfo);
     if (originalSize === 0) {
       originalSize = await _VideoConverter.getFileSize(mediaPath);
@@ -505,8 +506,14 @@ Error: ${stderr}`));
     console.log(`   \u6587\u4EF6\u5927\u5C0F: ${_VideoConverter.formatFileSize(originalSize)}`);
     console.log(`   \u76EE\u6807\u683C\u5F0F: ${targetFormat.value.toUpperCase()}`);
     console.log(`   \u538B\u7F29\u6A21\u5F0F: ${isCompress ? "\u662F" : "\u5426"}`);
-    const outputPath = _VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
-    console.log(`\u2705 \u8F93\u51FA\u8DEF\u5F84: ${outputPath}`);
+    let outputPath = "";
+    if (!outputDir) {
+      outputPath = _VideoConverter.generateOutputPath(mediaPath, targetFormat.value);
+      console.warn(`\u2705 \u8F93\u51FA\u8DEF\u5F84\u672A\u6307\u5B9A\uFF0C\u5C06\u4F7F\u7528\u9ED8\u8BA4\u8DEF\u5F84: ${outputPath}`);
+    } else {
+      outputPath = _VideoConverter.generateOutputPathFromDir(mediaPath, outputDir, targetFormat.value);
+      console.log(`\u2705 \u8F93\u51FA\u8DEF\u5F84: ${outputPath}`);
+    }
     const ffmpegArgs = this.buildFFmpegArgs(params, outputPath);
     console.log("\u{1F680} \u5F00\u59CB\u6267\u884C\u89C6\u9891\u8F6C\u6362...");
     const startTime = Date.now();
@@ -526,8 +533,8 @@ Error: ${stderr}`));
       console.log(`\u{1F4C9} \u538B\u7F29\u6BD4\u4F8B: ${compressionRatio.toFixed(1)}%`);
     }
     this.createPreview(
-      mediaInfo,
-      targetFormat,
+      mediaPath,
+      outputPath,
       originalSize,
       outputSize,
       compressionRatio,
@@ -548,7 +555,7 @@ var ConversionError = class extends Error {
   }
 };
 
-// tasks/cutopia/main.ts
+// tasks/converter/main.ts
 async function main_default(params, context) {
   var _a;
   try {

@@ -14,13 +14,15 @@ nodes:
         value: false
       - handle: targetFormat
         value:
-          name: MP4
-          value: .mp4
+          name: MOV
+          value: .mov
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage/New-Folder
     task: self::converter
   - node_id: get-media-info#1
     inputs_from:
       - handle: mediaPath
-        value: /oomol-driver/oomol-storage/1601363746034307-1750655937947.webm
+        value: /oomol-driver/oomol-storage/1601363746034307.mp4
     task: self::get-media-info
   - node_id: video_preview#1
     title: "Video preview #1"

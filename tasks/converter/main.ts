@@ -11,6 +11,7 @@ export type Outputs = {
 export type Inputs = {
     mediaPath: string | null;
     isCompress: boolean;
+    outputDir: string;
     mediaInfo: { 
         format_name: string; 
         audioChannels: string; 
