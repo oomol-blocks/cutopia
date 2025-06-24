@@ -5,7 +5,6 @@ import path from "path"
 import * as fs from 'node:fs/promises';
 
 import { FORMAT_CONFIGS, ConversionOptions, VIDEO_FORMATS, BYTES_PER_GB, BYTES_PER_MB, FFMPEG_PARAMS, CODEC_COMPATIBILITY } from "./constants"
-import { VideoFormatOption } from "./inputRender"
 import { Outputs, Inputs } from "./main"
 
 type MediaInfo = Inputs["mediaInfo"];
@@ -235,9 +234,7 @@ export class VideoConverter {
             // 分辨率缩放
             const { width, height } = VideoConverter.parseDimensions(mediaInfo.dimensions);
             if (width > 1920 || height > 1080) {
-                args.push('-vf',
-                    'scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2'
-                );
+                args.push('-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease');
             }
         }
 

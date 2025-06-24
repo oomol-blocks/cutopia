@@ -4,23 +4,23 @@ const tasks = [
     {
         name: 'render',
         config: {
-            entryPoints: ['tasks/converter/inputRender.tsx'],
+            entryPoints: ['tasks/media-converter/inputRender.tsx'],
             bundle: true,
             format: 'esm',
             loader: { '.svg': 'dataurl' },
             define: { 'process.env.NODE_ENV': '"production"' },
-            outfile: 'tasks/converter/bundled/inputRender.js'
+            outfile: 'tasks/media-converter/bundled/inputRender.js'
         }
     },
     {
         name: 'entry',
         config: {
-            entryPoints: ['tasks/converter/main.ts'],
+            entryPoints: ['tasks/media-converter/main.ts'],
             bundle: true,
             platform: 'node',
             format: 'esm',
             target: 'node16',
-            outdir: 'tasks/converter/bundled',
+            outdir: 'tasks/media-converter/bundled',
             external: [
                 // Node.js 内置模块
                 'os',

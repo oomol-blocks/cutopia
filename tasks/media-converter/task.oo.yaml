@@ -61,3 +61,4 @@ outputs_def:
     json_schema:
       type: string
 icon: ":carbon:video-player:"
+title: media-converter

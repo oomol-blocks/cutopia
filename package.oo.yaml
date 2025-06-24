@@ -1,4 +1,4 @@
-version: 0.0.3
+version: 0.0.6
 scripts:
   # Script executed when the container is first loaded
   # eg: bootstrap: poetry add pandas
@@ -7,7 +7,7 @@ scripts:
     poetry install --no-root
 contributes:
   input_widgets:
-    render: ./tasks/converter/bundled/inputRender.js
+    render: ./tasks/media-converter/bundled/inputRender.js
     widgets:
       - name: targetFormat
         json_schema:
@@ -19,5 +19,5 @@ name: cutopia
 description: Cutopia
 displayName: Cutopia
 repository: https://github.com/oomol-blocks/cutopia
-releaseNotes: fix build path
+releaseNotes: "fix `force_divisible_by` error "
 icon: ./icon.png

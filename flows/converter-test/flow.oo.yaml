@@ -1,6 +1,12 @@
-title: converter
+title: converter-test
 nodes:
-  - node_id: converter#1
+  - node_id: get-media-info#1
+    inputs_from:
+      - handle: mediaPath
+        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-24 at 15.17.03.mov
+    task: self::get-media-info
+  - node_id: media-converter#1
+    title: "media-converter #1"
     inputs_from:
       - handle: mediaPath
         from_node:
@@ -10,25 +16,20 @@ nodes:
         from_node:
           - node_id: get-media-info#1
             output_handle: mediaInfo
-      - handle: isCompress
-        value: false
-      - handle: targetFormat
-        value:
-          name: MOV
-          value: .mov
       - handle: outputDir
         value: /oomol-driver/oomol-storage/New-Folder
-    task: self::converter
-  - node_id: get-media-info#1
-    inputs_from:
-      - handle: mediaPath
-        value: /oomol-driver/oomol-storage/1601363746034307.mp4
-    task: self::get-media-info
+      - handle: isCompress
+        value: true
+      - handle: targetFormat
+        value:
+          name: MP4
+          value: .mp4
+    task: self::media-converter
   - node_id: video_preview#1
     title: "Video preview #1"
     inputs_from:
       - handle: video_path
         from_node:
-          - node_id: converter#1
+          - node_id: media-converter#1
             output_handle: media
     task: oomol-preview::video_preview

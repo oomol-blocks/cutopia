@@ -7,16 +7,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 
-// tasks/converter/main.ts
+// tasks/media-converter/main.ts
 import * as fs2 from "node:fs/promises";
 
-// tasks/converter/converter.ts
+// tasks/media-converter/converter.ts
 import { spawn } from "child_process";
 import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
 import path from "path";
 import * as fs from "node:fs/promises";
 
-// tasks/converter/constants.ts
+// tasks/media-converter/constants.ts
 var VIDEO_FORMATS = [
   ".mp4",
   ".avi",
@@ -134,7 +134,7 @@ var CODEC_COMPATIBILITY = {
 var BYTES_PER_GB = 1e9;
 var BYTES_PER_MB = 1e6;
 
-// tasks/converter/converter.ts
+// tasks/media-converter/converter.ts
 var VideoConverter = class _VideoConverter {
   constructor(context, options = {}) {
     this.totalDuration = 0;
@@ -301,10 +301,7 @@ var VideoConverter = class _VideoConverter {
     if (isCompress) {
       const { width, height } = _VideoConverter.parseDimensions(mediaInfo.dimensions);
       if (width > 1920 || height > 1080) {
-        args.push(
-          "-vf",
-          "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2"
-        );
+        args.push("-vf", "scale=1920:1080:force_original_aspect_ratio=decrease");
       }
     }
     const customQuality = this.options.customQuality;
@@ -555,7 +552,7 @@ var ConversionError = class extends Error {
   }
 };
 
-// tasks/converter/main.ts
+// tasks/media-converter/main.ts
 async function main_default(params, context) {
   var _a;
   try {
