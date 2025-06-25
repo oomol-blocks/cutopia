@@ -42,4 +42,4 @@ executor:
     entry: main.ts
     spawn: false
 title: convert-to-wmv
-icon: ":simple-icons:microsoft:#519ABA:"
+icon: "../icons/wmv.svg"

@@ -42,4 +42,4 @@ executor:
     entry: main.ts
     spawn: false
 title: convert-to-webm
-icon: ":simple-icons:google:#519ABA:"
+icon: "../icons/webm.svg"

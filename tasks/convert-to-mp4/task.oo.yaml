@@ -41,4 +41,4 @@ executor:
     entry: main.ts
     spawn: false
 title: convert-to-mp4
-icon: ":carbon:mp4:#519ABA:"
+icon: "../icons/mp4.svg"
