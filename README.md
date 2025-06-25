@@ -1,162 +1,134 @@
 <div align=center>
   <h1>Cutopia</h1>
-  <p><a href="./README-zh.md">中文</a> | English</p>
+  <p><a href="./README_CN.md">中文</a> | English</p>
 </div>
 
-A comprehensive video processing solution built with Oomol blocks, powered by `FFmpeg` for professional-grade media analysis and format conversion capabilities.
+A video processing solution built on OOMOL Blocks, utilizing `FFmpeg` for media analysis and format conversion.
 
-## 📦 Blocks Overview
+## 📈 Use Cases
 
-This project consists of two main blocks that work together to provide complete video processing functionality:
+### Content Creation Workflow
+- **Multi-format Publishing** - Convert once, distribute everywhere
+- **Quality Optimization** - Reduce file sizes while maintaining visual quality
+- **Metadata Management** - Preserve or customize video metadata
 
-### 1. **get-media-info** - Media Analysis Block
-Analyzes video files and extracts comprehensive metadata information.
+### Professional Video Processing
+- **Format Standardization** - Ensure consistent output across projects
+- **Archive Migration** - Convert legacy formats to modern standards
+- **Delivery Optimization** - Optimize for different platforms and devices
 
-### 2. **cutopia** - Video Conversion Block  
-Converts videos between different formats with optional compression and quality optimization.
+## 📦 Module Architecture
 
-### Supported Input Formats
-- MP4 (.mp4)
-- QuickTime (.mov)
-- WebM (.webm)
-<!-- - AVI (.avi)
-- Matroska (.mkv)
-- Windows Media Video (.wmv) -->
+This project consists of multiple modules that work together:
 
-### Supported Output Formats
-- MP4
-- WebM
-- MOV
-<!-- - AVI
-- WMV -->
+### 1. **get-media-info** - Media Analysis Module
+Uses FFprobe to analyze video files and extract detailed metadata information.
 
-### Quality Presets（Build-In temporarily）
-- **Ultra High (4K 60fps)**: Premium quality for 4K content
-- **Very High (4K/2K)**: High-quality encoding for UHD content
-- **High (1080p)**: Standard high-definition quality
-- **Medium (720p)**: Balanced quality and file size
-- **Low (SD)**: Optimized for smaller file sizes
+```ts
+export interface IMediaInfo {
+    path: string;                    // Input file path
+    dimensions: {
+        width: number;
+        height: number;
+    }                                // Video dimensions
+    size: number;                    // File size
+    containerFormat: string;         // Container format
+    videoCodec?: string;             // Video codec
+    audioCodec?: string;             // Audio codec
+    bitrateMbps?: number;            // Bitrate in megabits per second
+}
+```
 
-## 📋 Usage
+### 2. `convert-to-${container}` - Format Conversion Modules
 
-### Block 1: Media Analysis
+Currently supports conversion to **MP4** (.mp4), **QuickTime** (.mov), **WebM** (.webm), **Matroska** (.mkv), and **Windows Media** (.wmv) formats.
+
+## 🚀 Quick Start
+
+### Step 1: Analyze Media File
 ```typescript
 // Input
 {
-  mediaPath: string  // Path to the video file
+  mediaPath: "/path/to/video.mp4"
 }
 
 // Output
 {
-  mediaPath: string,
   mediaInfo: {
-    name: string,           // File name
-    kind: string,           // File extension
-    size: string,           // File size (formatted)
-    dimensions: string,     // Resolution (e.g., "1920x1080")
-    duration: string,       // Duration (HH:MM:SS)
-    quality: string,        // Quality assessment
-    codecs: string,         // Video and audio codecs
-    colorProfile: string,   // Color space information
-    codeRate: string,       // Bitrate information
-    audioChannels: string,  // Audio channel layout
-    format_name: string     // Container format
+    path: string,
+    dimensions: { width: number, height: number },
+    size: number,
+    containerFormat: string,
+    videoCodec: string,
+    audioCodec: string,
+    bitrateMbps: number
   }
 }
 ```
 
-### Block 2: Video Conversion
+### Step 2: Convert Video
 ```typescript
 // Input
 {
-  mediaPath: string,      // Input file path
-  mediaInfo: object,      // Media info from analysis block
-  targetFormat: {         // Target format configuration
-    value: string,        // Format extension (e.g., ".mp4")
-    label: string         // Display name
-  },
-  isCompress: boolean,    // Enable compression
-//   customQuality?: number, // Custom quality setting
-//   customBitrate?: string, // Custom bitrate
-//   preserveMetadata?: boolean,
-//   hardwareAcceleration?: string,
-//   preset?: string
+  mediaInfo: /* Result from step 1 */,
+  outputDir?: string,          // Optional output directory
+  // More options available for advanced users
 }
 
 // Output
 {
-  media: string  // Path to converted file
+  mediaPath: string  // Path to converted file
 }
 ```
 
-## 🎯 Use Cases
+## 🎛️ Advanced Configuration
 
-### Content Creation
-- **Format Standardization**: Convert mixed-format content to consistent output
-- **Quality Optimization**: Reduce file sizes while maintaining visual quality
-- **Platform Compatibility**: Ensure videos work across different platforms
+### Quality Presets
+The system automatically selects optimal quality settings based on content analysis:
 
-### Media Processing Workflows
-- **Metadata Management**: Extract and preserve important file information
-
-### Storage Optimization
-- **Compression**: Reduce storage requirements without quality loss
-- **Format Migration**: Update legacy formats to modern standards
-- **Bitrate Optimization**: Balance quality and bandwidth requirements
-
-## 🔍 Advanced Features
-
-### Smart Stream Copying
-The converter intelligently detects when video/audio streams are already compatible with the target format, allowing for:
-- **Ultra-fast conversion** (no re-encoding needed)
-- **Zero quality loss**
-- **Minimal processing time**
+- **Ultra High Quality** (4K 60fps): CRF 18, premium encoding
+- **High Quality** (4K/2K): CRF 20, professional grade
+- **Medium Quality** (1080p): CRF 23, balanced encoding
+- **Fast Quality** (720p): CRF 26, speed optimized
 
 ### Codec Compatibility Matrix
-Automatic detection of codec compatibility across formats:
-- H.264/H.265 compatibility with MP4/MOV
-- VP8/VP9 compatibility with WebM
-- Audio codec matching (AAC, MP3, Opus)
+Intelligent detection ensures optimal conversion paths:
 
-### Progress Monitoring
-Real-time conversion progress with:
-- **Percentage completion**
-- **Time estimates**
-- **Processing speed metrics**
+| Format | Video Codecs | Audio Codecs | Container |
+|--------|-------------|-------------|-----------|
+| MP4    | H.264, H.265, AV1 | AAC, MP3 | MPEG-4 |
+| WebM   | VP8, VP9, AV1 | Opus, Vorbis | WebM |
+| MOV    | H.264, H.265, ProRes | AAC, PCM | QuickTime |
+| MKV    | H.264, H.265, VP9 | AAC, Opus, FLAC | Matroska |
+| WMV    | WMV, VC-1 | WMA, MP3 | ASF |
 
-## 📊 Performance Optimizations
+## ⚡ Performance Features
 
-<!-- ### Hardware Acceleration
-- **NVIDIA NVENC**: GPU-accelerated encoding
-- **Intel Quick Sync**: Hardware-accelerated processing
-- **Automatic fallback**: Software encoding when hardware unavailable -->
+1. **When source and target formats are compatible:**
+- **Zero Quality Loss** - Perfect stream copying
+- **Ultra-fast Processing** - No re-encoding required
+- **Minimal CPU Usage** - Container wrapping only
 
-## 🚦 Error Handling
+2. **Quality automatically assessed based on:**
+- Resolution
+- Bitrate analysis
 
-Comprehensive error handling with:
-- **Input validation**: File format and path verification
-- **Conversion monitoring**: Real-time error detection
-- **Graceful fallbacks**: Alternative processing methods
-- **Detailed error reporting**: Clear error messages and troubleshooting info
+3. **Real-time Feedback:**
+- Completion percentage
+- File size comparison
 
-## 📈 Monitoring & Reporting
+## 📊 Monitoring and Reporting
 
-### Conversion Reports
-- Processing time metrics
-- File size comparisons
-- Compression ratios
-- Quality assessments
+### Error Handling
+Comprehensive error detection and reporting:
+- Input validation errors
+- Codec compatibility issues
+- Detailed logs for processing failures
+- Resource availability problems
 
-### Preview Tables
-Both blocks provide detailed preview tables showing:
-- Input/output file information
-- Processing statistics
-- Quality metrics
-- Error details (when applicable)
+## 🔍 Dependencies
 
-## 📚 Dependencies
-
-### Core Dependencies
-- **FFmpeg**: Video processing engine
-- **FFprobe**: Media analysis tool
-- **Node.js**: Runtime environment
+- **FFmpeg** - Video processing engine (via @ffmpeg-installer/ffmpeg)
+- **FFprobe** - Media analysis tool (via @ffprobe-installer/ffprobe)
+- **Node.js** - Runtime environment
+- **Oomol Platform** - Module execution environment

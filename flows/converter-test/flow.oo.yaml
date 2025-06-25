@@ -5,31 +5,102 @@ nodes:
       - handle: mediaPath
         value: /oomol-driver/oomol-storage/Screen Recording 2025-06-24 at 15.17.03.mov
     task: self::get-media-info
-  - node_id: media-converter#1
-    title: "media-converter #1"
-    inputs_from:
-      - handle: mediaPath
-        from_node:
-          - node_id: get-media-info#1
-            output_handle: mediaPath
-      - handle: mediaInfo
-        from_node:
-          - node_id: get-media-info#1
-            output_handle: mediaInfo
-      - handle: outputDir
-        value: /oomol-driver/oomol-storage/New-Folder
-      - handle: isCompress
-        value: true
-      - handle: targetFormat
-        value:
-          name: MP4
-          value: .mp4
-    task: self::media-converter
   - node_id: video_preview#1
     title: "Video preview #1"
     inputs_from:
       - handle: video_path
         from_node:
-          - node_id: media-converter#1
-            output_handle: media
+          - node_id: convert-to-mp4#1
+            output_handle: mediaPath
+    task: oomol-preview::video_preview
+  - node_id: convert-to-mp4#1
+    task: self::convert-to-mp4
+    inputs_from:
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage/New Folder
+      - handle: mediaInfo
+        value:
+          {}
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: convert-to-mov#1
+    task: self::convert-to-mov
+    inputs_from:
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage
+      - handle: mediaInfo
+        value:
+          {}
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: convert-to-webm#1
+    task: self::convert-to-webm
+    inputs_from:
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage
+      - handle: mediaInfo
+        value:
+          {}
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: convert-to-mkv#1
+    task: self::convert-to-mkv
+    inputs_from:
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage
+      - handle: mediaInfo
+        value:
+          {}
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: convert-to-wmv#1
+    task: self::convert-to-wmv
+    inputs_from:
+      - handle: outputDir
+        value: /oomol-driver/oomol-storage
+      - handle: mediaInfo
+        value:
+          {}
+        from_node:
+          - node_id: get-media-info#1
+            output_handle: mediaInfo
+  - node_id: video_preview#2
+    node_type: task_node
+    title: "Video preview #2"
+    inputs_from:
+      - handle: video_path
+        from_node:
+          - node_id: convert-to-mov#1
+            output_handle: mediaPath
+    task: oomol-preview::video_preview
+  - node_id: video_preview#3
+    node_type: task_node
+    title: "Video preview #3"
+    inputs_from:
+      - handle: video_path
+        from_node:
+          - node_id: convert-to-webm#1
+            output_handle: mediaPath
+    task: oomol-preview::video_preview
+  - node_id: video_preview#4
+    node_type: task_node
+    title: "Video preview #4"
+    inputs_from:
+      - handle: video_path
+        from_node:
+          - node_id: convert-to-mkv#1
+            output_handle: mediaPath
+    task: oomol-preview::video_preview
+  - node_id: video_preview#5
+    node_type: task_node
+    title: "Video preview #5"
+    inputs_from:
+      - handle: video_path
+        from_node:
+          - node_id: convert-to-wmv#1
+            output_handle: mediaPath
     task: oomol-preview::video_preview

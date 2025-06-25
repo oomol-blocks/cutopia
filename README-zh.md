@@ -5,153 +5,130 @@
 
 基于 OOMOL Blocks 构建的视频处理解决方案，使用 `FFmpeg` 媒体分析和格式转换功能。
 
-### 📦 `Blocks` 概览
+## 📈 使用场景
 
-该项目由两个主要 `blocks` 组成，协同工作提供完整的视频处理功能：
+### 内容创作工作流
+- **多格式发布** - 一次转换，到处分发
+- **质量优化** - 在保持画质的同时减小文件大小
+- **元数据管理** - 保留或自定义视频元数据
 
-#### 1. **get-media-info** - 媒体分析
-分析视频文件并提取全面的元数据信息。
+### 专业视频处理
+- **格式标准化** - 确保项目间输出的一致性
+- **存档转换** - 将老格式迁移到现代标准
+- **交付优化** - 针对不同平台和设备优化
 
-#### 2. **cutopia** - 视频转换
-支持不同格式的视频之间转换，支持可选的压缩和质量优化。
+## 📦 模块架构
 
-### 支持的输入格式
-- MP4 (.mp4)
-- QuickTime (.mov)
-- WebM (.webm)
-<!-- - AVI (.avi)
-- Matroska (.mkv)
-- Windows Media Video (.wmv) -->
+本项目包含多个模块，相互配合使用：
 
-### 支持的输出格式
-- MP4
-- WebM
-- MOV
-<!-- - AVI
-- WMV -->
+### 1. **get-media-info** - 媒体分析模块
+使用 FFprobe 分析视频文件，提取详细的元数据信息。
 
-### 质量预设（当前为内置）
-- **超高质量 (4K 60fps)**: 4K内容的顶级质量
-- **极高质量 (4K/2K)**: UHD内容的高质量编码
-- **高质量 (1080p)**: 标准高清质量
-- **中等质量 (720p)**: 质量与文件大小的平衡
-- **低质量 (SD)**: 针对小文件大小优化
+```ts
+export interface IMediaInfo {
+    path: string;                    // 输入文件路径
+    dimensions: {
+        width: number;
+        height: number;
+    }                                // 视频尺寸
+    size: number;                    // 文件大小
+    containerFormat: string;         // 容器格式
+    videoCodec?: string;             // 视频编解码器
+    audioCodec?: string;             // 音频编解码器
+    bitrateMbps?: number;            // 比特率（以兆比特每秒为单位）
+}
+```
 
-### 📋 使用方法
+### 2. `convert-to-${container}` - 格式转换模块
 
-#### Block 1：媒体分析
+目前支持转换为 **MP4** (.mp4)、**QuickTime** (.mov)、**WebM** (.webm)、**Matroska** (.mkv)、**Windows Media** (.wmv) 格式。
+
+## 🚀 快速上手
+
+### 第一步：分析媒体文件
 ```typescript
 // 输入
 {
-  mediaPath: string  // 视频文件路径
+  mediaPath: "/path/to/video.mp4"
 }
 
 // 输出
 {
-  mediaPath: string,
   mediaInfo: {
-    name: string,           // 文件名
-    kind: string,           // 文件扩展名
-    size: string,           // 文件大小（格式化）
-    dimensions: string,     // 分辨率（如："1920x1080"）
-    duration: string,       // 时长（时:分:秒）
-    quality: string,        // 质量评估
-    codecs: string,         // 视频和音频编解码器
-    colorProfile: string,   // 色彩空间信息
-    codeRate: string,       // 比特率信息
-    audioChannels: string,  // 音频声道布局
-    format_name: string     // 容器格式
+    path: string,
+    dimensions: { width: number, height: number },
+    size: number,
+    containerFormat: string,
+    videoCodec: string,
+    audioCodec: string,
+    bitrateMbps: number
   }
 }
 ```
 
-#### Block 2：视频转换
+### 第二步：转换视频
 ```typescript
 // 输入
 {
-  mediaPath: string,      // 输入文件路径
-  mediaInfo: object,      // 媒体分析 Block 的输出
-  targetFormat: {         // 目标格式配置
-    value: string,        // 格式扩展名（如：".mp4"）
-    label: string         // 显示名称
-  },
-  isCompress: boolean,    // 启用压缩
-//   customQuality?: number, // 自定义质量设置
-//   customBitrate?: string, // 自定义比特率
-//   preserveMetadata?: boolean,
-//   hardwareAcceleration?: string,
-//   preset?: string
+  mediaInfo: /* 来自第一步的结果 */,
+  outputDir?: string,          // 可选的输出目录
+  // 高级用户还有更多选项可用
 }
 
 // 输出
 {
-  media: string  // 转换后文件的路径
+  mediaPath: string  // 转换后文件的路径
 }
 ```
 
-### 🎯 使用场景
+## 🎛️ 高级配置
 
-#### 内容创作
-- **格式标准化**: 将混合格式内容转换为一致的输出
-- **质量优化**: 在保持视觉质量的同时减小文件大小
-- **平台兼容性**: 确保视频在不同平台上正常工作
+### 质量预设
+系统会根据内容分析自动选择最佳的质量设置：
 
-#### 媒体处理工作流
-- **元数据管理**: 提取和保存重要的文件信息
+- **超高质量** (4K 60fps)：CRF 18，顶级编码
+- **高质量** (4K/2K)：CRF 20，专业级别
+- **中等质量** (1080p)：CRF 23，均衡编码
+- **快速质量** (720p)：CRF 26，速度优化
 
-#### 存储优化
-- **压缩**: 在不损失质量的情况下减少存储需求
-- **格式迁移**: 将旧格式更新为现代标准
-- **比特率优化**: 平衡质量和带宽需求
+### 编解码器兼容性表
+智能检测确保最优的转换路径：
 
-### 🔍 高级功能
+| 格式 | 视频编解码器 | 音频编解码器 | 容器 |
+|------|-------------|-------------|------|
+| MP4  | H.264, H.265, AV1 | AAC, MP3 | MPEG-4 |
+| WebM | VP8, VP9, AV1 | Opus, Vorbis | WebM |
+| MOV  | H.264, H.265, ProRes | AAC, PCM | QuickTime |
+| MKV  | H.264, H.265, VP9 | AAC, Opus, FLAC | Matroska |
+| WMV  | WMV, VC-1 | WMA, MP3 | ASF |
 
-#### 智能流复制
-转换器智能检测视频/音频流是否已与目标格式兼容，实现：
-- **超快转换**（无需重新编码）
-- **零质量损失**
-- **最短处理时间**
+## ⚡ 性能特色
 
-#### 编解码器兼容性矩阵
-自动检测跨格式的编解码器兼容性：
-- H.264/H.265 与 MP4/MOV 的兼容性
-- VP8/VP9 与 WebM 的兼容性
-- 音频编解码器匹配 (AAC, MP3, Opus)
+1. **当源格式和目标格式兼容时：**
+- **零质量损失** - 完美的流复制
+- **超快处理速度** - 无需重新编码
+- **最小 CPU 占用** - 仅做容器封装
 
-#### 进度监控
-实时转换进度，包括：
-- **完成百分比**
-- **时间估算**
-- **处理速度指标**
+2. **质量基于以下因素自动评估：**
+- 分辨率
+- 比特率分析
 
-### 📊 性能优化
+3. **实时反馈：**
+- 完成百分比
+- 文件大小对比
 
-### 🚦 错误处理
+## 📊 监控和报告
 
-全面的错误处理，包括：
-- **输入验证**: 文件格式和路径验证
-- **转换监控**: 实时错误检测
-- **优雅降级**: 替代处理方法
-- **详细错误报告**: 清晰的错误信息和故障排除信息
+### 错误处理
+全面的错误检测和报告：
+- 输入验证错误
+- 编解码器兼容性问题
+- 处理失败的详细日志
+- 资源可用性问题
 
-### 📈 监控与报告
+## 🔍 依赖项
 
-#### 转换报告
-- 处理时间指标
-- 文件大小比较
-- 压缩比率
-- 质量评估
-
-#### 预览表格
-两个 Block 都提供了详细的 OOMOL 预览表格，显示：
-- 输入/输出文件信息
-- 处理统计信息
-- 质量指标
-- 错误详情（如适用）
-
-### 📚 依赖项
-
-#### 核心依赖
-- **FFmpeg**: 视频处理引擎
-- **FFprobe**: 媒体分析工具
-- **Node.js**: 运行时环境
+- **FFmpeg** - 视频处理引擎 (通过 @ffmpeg-installer/ffmpeg)
+- **FFprobe** - 媒体分析工具 (通过 @ffprobe-installer/ffprobe)
+- **Node.js** - 运行时环境
+- **Oomol 平台** - 模块执行环境

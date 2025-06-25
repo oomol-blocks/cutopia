@@ -1,17 +1,11 @@
 ui:
-  default_width: 530.060834030878
+  default_width: 450
 inputs_def:
-  - handle: mediaPath
+  - handle: outputDir
     description: Input
     json_schema:
       type: string
-      ui:widget: file
-outputs_def:
-  - handle: mediaPath
-    json_schema:
-      type: string
-      ui:widget: file
-    nullable: true
+      ui:widget: dir
   - handle: mediaInfo
     description: Output
     json_schema:
@@ -37,9 +31,15 @@ outputs_def:
         audioCodec:
           type: string
     nullable: false
+outputs_def:
+  - handle: mediaPath
+    description: Output
+    json_schema:
+      type: string
 executor:
   name: nodejs
   options:
     entry: main.ts
     spawn: false
-icon: ":simple-icons:ffmpeg:#519ABA:"
+title: convert-to-wmv
+icon: ":simple-icons:microsoft:#519ABA:"
