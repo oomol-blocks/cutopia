@@ -1,4 +1,4 @@
-version: 0.0.9
+version: 0.0.10
 scripts:
   # Script executed when the container is first loaded
   # eg: bootstrap: poetry add pandas
@@ -11,5 +11,5 @@ name: cutopia
 description: Cutopia
 displayName: Cutopia
 repository: https://github.com/oomol-blocks/cutopia
-releaseNotes: update icon
+releaseNotes: Clean up unused packages
 icon: ./icon.png

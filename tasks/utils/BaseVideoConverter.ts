@@ -1,19 +1,15 @@
 import type { Context } from "@oomol/types/oocana";
-import { spawn } from "child_process";
-import { path as ffmpegPath } from "@ffmpeg-installer/ffmpeg";
-import path from "path";
-import * as fs from 'node:fs/promises';
 
 import {
     FORMAT_CONFIGS,
     ConversionOptions,
     FFMPEG_PARAMS,
-    CODEC_COMPATIBILITY,
     IMediaInfo,
 } from "./constants";
 import { FFmpegExecutor } from "./FFmpegExecutor";
-import { FFmpegArgsBuilder } from "./FFmpegArgsBuilder";
+import { FFmpegArgsBuilder } from "./MediaConversionArgsBuilder";
 import { FileUtils } from "./FileUtils";
+import { Helper } from "./helper"
 
 export interface BaseInputs {
     outputDir?: string;
@@ -119,23 +115,11 @@ export abstract class BaseVideoConverter<TInputs extends BaseInputs, TOutputs ex
         const conversionTime = Date.now() - startTime;
         const outputSize = await FileUtils.getFileSize(outputPath);
 
-        console.log(`⏰ 转换时长：${formatTime(conversionTime)}. 输出文件大小：${FileUtils.formatFileSize(outputSize)}`);
+        console.log(`⏰ 转换时长：${Helper.formatTime(conversionTime)}. 输出文件大小：${FileUtils.formatFileSize(outputSize)}`);
         console.log(`🎉 转换到 ${this.targetFormat.toUpperCase()} 格式完成!`);
         return {
             mediaPath: outputPath
         } as TOutputs;
-    }
-}
-
-function formatTime(milliseconds) {
-    if (milliseconds < 1000) {
-        return `${milliseconds} 毫秒`;
-    } else if (milliseconds < 60000) {
-        return `${(milliseconds / 1000).toFixed(2)} 秒`;
-    } else {
-        const minutes = Math.floor(milliseconds / 60000);
-        const seconds = ((milliseconds % 60000) / 1000).toFixed(2);
-        return `${minutes} 分 ${seconds} 秒`;
     }
 }
 

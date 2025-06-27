@@ -23,18 +23,23 @@ export class FileUtils {
         }
     }
 
-    static generateOutputPath(inputPath: string, targetFormat: keyof typeof FORMAT_CONFIGS): string {
-        const extension = FORMAT_CONFIGS[targetFormat].extension;
+    static generateOutputPath(inputPath: string, targetFormat: string): string {
+        const extension = FORMAT_CONFIGS[targetFormat].extension || `.${targetFormat}`;
         return `${inputPath.replace(path.extname(inputPath), '')}-${Date.now()}${extension}`;
     }
 
     static generateOutputPathFromDir(
         inputPath: string, 
         outputDir: string, 
-        targetFormat: keyof typeof FORMAT_CONFIGS
+        targetFormat: string
     ): string {
         const baseName = path.basename(inputPath, path.extname(inputPath));
-        const extension = FORMAT_CONFIGS[targetFormat].extension;
+        const extension = FORMAT_CONFIGS[targetFormat].extension || `.${targetFormat}`;
         return path.join(outputDir, `${baseName}-${Date.now()}${extension}`);
+    }
+
+    static getFileFormat(filePath: string): string {
+        const ext = path.extname(filePath);
+        return ext ? ext.slice(1) : '';
     }
 }

@@ -3,7 +3,7 @@ nodes:
   - node_id: get-media-info#1
     inputs_from:
       - handle: mediaPath
-        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-24 at 15.17.03.mov
+        value: /oomol-driver/oomol-storage/Screen Recording 2025-06-26 at 17.23.27.mov
     task: self::get-media-info
   - node_id: video_preview#1
     title: "Video preview #1"
